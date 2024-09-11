@@ -257,14 +257,23 @@ private:
 class CInfoBlock
 {
 public:
+   // IP address,可用作getKey的key值
    uint32_t m_piIP[4];		// IP address, machine read only, not human readable format
+   // IPv4 or IPv6
    int m_iIPversion;		// IP version
+   // timestamp
    uint64_t m_ullTimeStamp;	// last update time
+   // rtt
    int m_iRTT;			// RTT
+   // 估算的带宽
    int m_iBandwidth;		// estimated bandwidth
+   // 平均丢包率
    int m_iLossRate;		// average loss rate
+   // 重排序距离？什么意思？
    int m_iReorderDistance;	// packet reordering distance
+   // 包间时间，拥塞控制
    double m_dInterval;		// inter-packet time, congestion control
+   // 拥塞控制窗口大小
    double m_dCWnd;		// congestion window size, congestion control
 
 public:
@@ -286,6 +295,7 @@ public:
       // Returned value:
       //    None.
 
+   // 将sockaddr类型转换为整数数组
    static void convert(const sockaddr* addr, int ver, uint32_t ip[]);
 };
 

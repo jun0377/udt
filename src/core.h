@@ -311,6 +311,7 @@ private: // Options
    int64_t m_llMaxBW;				// maximum data transfer rate (threshold)
 
 private: // congestion control
+   // 拥塞控制工程模式
    CCCVirtualFactory* m_pCCFactory;             // Factory class to create a specific CC instance
    CCC* m_pCC;                                  // congestion control class
    CCache<CInfoBlock>* m_pCache;		// network information cache

@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
       return 0;
    }
 
-   // socket,返回的并不是实际的sockfd，而是sockfd对应的唯一标识符，是一个随机值
+   // socket,这一步实际上并没有执行系统socket函数，只是初始化了一些参数
    UDTSOCKET serv = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
    // UDT Options

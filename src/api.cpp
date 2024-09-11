@@ -147,6 +147,7 @@ m_ClosedSockets()
    #endif
 
    #ifndef WIN32
+      // 每个线程都有自己独立的errno
       pthread_key_create(&m_TLSError, TLSDestroy);
    #else
       m_TLSError = TlsAlloc();
@@ -180,9 +181,9 @@ CUDTUnited::~CUDTUnited()
 
 int CUDTUnited::startup()
 {
-   CGuard gcinit(m_InitLock); // C++11的std::lock_gurad可以实现相同的功能
+   CGuard gcinit(m_InitLock);
 
-   // 只允许有一个udt实例,此处似乎应该使用单例模式来实现
+   // 只允许有一个udt实例,此处应当使用单例模式来实现
    if (m_iInstanceCount++ > 0){
       std::cout << "An udt instance is already running..." << std::endl;
       return 0;
@@ -270,7 +271,7 @@ UDTSOCKET CUDTUnited::newSocket(int af, int type)
    {
       // UDT套接字
       ns = new CUDTSocket;
-      // UDT句柄
+      // UDT句柄，注意：此时才创建了一个CUDT实例
       ns->m_pUDT = new CUDT;
       if (AF_INET == af)
       {
@@ -292,7 +293,7 @@ UDTSOCKET CUDTUnited::newSocket(int af, int type)
    }
 
    CGuard::enterCS(m_IDLock);
-   ns->m_SocketID = -- m_SocketID;  // m_SocketID 是一个随机值，在CUDTUnited构造函数中生成
+   ns->m_SocketID = -- m_SocketID;
    CGuard::leaveCS(m_IDLock);
 
    ns->m_Status = INIT;
@@ -302,7 +303,7 @@ UDTSOCKET CUDTUnited::newSocket(int af, int type)
    ns->m_pUDT->m_SocketID = ns->m_SocketID;
    ns->m_pUDT->m_iSockType = (SOCK_STREAM == type) ? UDT_STREAM : UDT_DGRAM;
    ns->m_pUDT->m_iIPversion = ns->m_iIPversion = af;
-   ns->m_pUDT->m_pCache = m_pCache;    // 这个Cache有啥用
+   ns->m_pUDT->m_pCache = m_pCache;
 
    // protect the m_Sockets structure.
    CGuard::enterCS(m_ControlLock);
@@ -510,7 +511,6 @@ UDTSTATUS CUDTUnited::getStatus(const UDTSOCKET u)
    return i->second->m_Status;   
 }
 
-// 实际上这一步并没有执行bind操作，只是初始化了sockfd对应的发送/接收队列，以及一些其他属性
 int CUDTUnited::bind(const UDTSOCKET u, const sockaddr* name, int namelen)
 {
    // 根据socket id查找CUDTSocket实例
@@ -539,7 +539,7 @@ int CUDTUnited::bind(const UDTSOCKET u, const sockaddr* name, int namelen)
    }
 
    // 初始化sockfd相关属性
-   s->m_pUDT->open();
+   s->m_pUDT->open();         // open一个UDT实例
    updateMux(s, name);        // 多路复用器，不理解
    s->m_Status = OPENED;
 
@@ -1460,6 +1460,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
    m.m_pChannel->setSndBufSize(s->m_pUDT->m_iUDPSndBufSize);
    m.m_pChannel->setRcvBufSize(s->m_pUDT->m_iUDPRcvBufSize);
 
+   // 到这一步才真正调用系统socket创建了一个套接字,并进行bind
    try
    {
       if (NULL != udpsock)
@@ -1522,7 +1523,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const CUDTSocket* ls)
 {
    CUDTUnited* self = (CUDTUnited*)p;
 
-   CGuard gcguard(self->m_GCStopLock); // std::lock_guard
+   CGuard gcguard(self->m_GCStopLock);
 
    while (!self->m_bClosing)
    {
@@ -1610,6 +1611,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const CUDTSocket* ls)
 
 int CUDT::startup()
 {
+   // 注意：s_UDTUnited是一个静态全局变量，在程序启动时自动构建初始化
    return s_UDTUnited.startup();
 }
 

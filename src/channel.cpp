@@ -89,6 +89,7 @@ CChannel::~CChannel()
 {
 }
 
+// 执行系统api: socket bind
 void CChannel::open(const sockaddr* addr)
 {
    // construct an socket
@@ -160,7 +161,7 @@ void CChannel::setUDPSockOpt()
       // Known BSD bug as the day I wrote this code.
       // A small time out value will cause the socket to block forever.
       tv.tv_usec = 10000;
-   #else
+   #else    // Ubuntu中执行下面的逻辑
       tv.tv_usec = 100;
    #endif
 
@@ -174,7 +175,7 @@ void CChannel::setUDPSockOpt()
       DWORD ot = 1; //milliseconds
       if (0 != ::setsockopt(m_iSocket, SOL_SOCKET, SO_RCVTIMEO, (char *)&ot, sizeof(DWORD)))
          throw CUDTException(1, 3, NET_ERROR);
-   #else
+   #else // Ubuntu中执行下面的逻辑，设置接收超时时间为100us
       // Set receiving time-out value
       if (0 != ::setsockopt(m_iSocket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(timeval)))
          throw CUDTException(1, 3, NET_ERROR);
