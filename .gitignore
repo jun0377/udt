@@ -1,4 +1,5 @@
 **/*.o
 **/*.d
 **/libudt.so
+**/libudt.a
 **/*proj
