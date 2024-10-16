@@ -125,33 +125,64 @@ enum EPOLLOpt
    UDT_EPOLL_ERR = 0x8
 };
 
-enum UDTSTATUS {INIT = 1, OPENED, LISTENING, CONNECTING, CONNECTED, BROKEN, CLOSING, CLOSED, NONEXIST};
+enum UDTSTATUS {
+   INIT = 1, 
+   OPENED, 
+   LISTENING, 
+   CONNECTING, 
+   CONNECTED, 
+   BROKEN, 
+   CLOSING, 
+   CLOSED, 
+   NONEXIST
+   };
 
 ////////////////////////////////////////////////////////////////////////////////
 
 enum UDTOpt
 {
-   UDT_MSS,             // the Maximum Transfer Unit
-   UDT_SNDSYN,          // if sending is blocking
-   UDT_RCVSYN,          // if receiving is blocking
-   UDT_CC,              // custom congestion control algorithm
-   UDT_FC,		// Flight flag size (window size)
-   UDT_SNDBUF,          // maximum buffer in sending queue
-   UDT_RCVBUF,          // UDT receiving buffer size
-   UDT_LINGER,          // waiting for unsent data when closing
-   UDP_SNDBUF,          // UDP sending buffer size
-   UDP_RCVBUF,          // UDP receiving buffer size
-   UDT_MAXMSG,          // maximum datagram message size
-   UDT_MSGTTL,          // time-to-live of a datagram message
-   UDT_RENDEZVOUS,      // rendezvous connection mode
-   UDT_SNDTIMEO,        // send() timeout
-   UDT_RCVTIMEO,        // recv() timeout
-   UDT_REUSEADDR,	// reuse an existing port or create a new one
-   UDT_MAXBW,		// maximum bandwidth (bytes per second) that the connection can use
-   UDT_STATE,		// current socket state, see UDTSTATUS, read only
-   UDT_EVENT,		// current avalable events associated with the socket
-   UDT_SNDDATA,		// size of data in the sending buffer
-   UDT_RCVDATA		// size of data available for recv
+   // 最大传输单元
+   UDT_MSS,             // 最大传输单元，the Maximum Transfer Unit
+   // 阻塞发送
+   UDT_SNDSYN,          // 阻塞发送，if sending is blocking
+   // 阻塞接收
+   UDT_RCVSYN,          // 阻塞接收，if receiving is blocking
+   // 拥塞控制算法
+   UDT_CC,              // 拥塞控制算法，custom congestion control algorithm
+   // 窗口大小
+   UDT_FC,		         // 窗口大小,单位是UDT_MSS ??? , Flight flag size (window size)
+   // 发送缓冲区
+   UDT_SNDBUF,          // 发送缓冲区，maximum buffer in sending queue
+   // 接收缓冲区
+   UDT_RCVBUF,          // 接收缓冲区UDT receiving buffer size
+   // 关闭时先把未发送的数据发出去
+   UDT_LINGER,          // 关闭时先把未发送的数据发出去，waiting for unsent data when closing
+   // UDP发送缓冲区大小
+   UDP_SNDBUF,          // UDP发送缓冲区大小，UDP sending buffer size
+   // UDP接收缓冲区大小
+   UDP_RCVBUF,          // UDP接收缓冲区大小,UDP receiving buffer size
+   // 数据报最大长度
+   UDT_MAXMSG,          // 数据报最大长度，maximum datagram message size
+   // 生存时长
+   UDT_MSGTTL,          // 生存时长，time-to-live of a datagram message
+   // 交会发送模式？？？
+   UDT_RENDEZVOUS,      // 交会发送模式？？？，rendezvous connection mode
+   // 发送超时
+   UDT_SNDTIMEO,        // 发送超时，send() timeout
+   // 接收超时
+   UDT_RCVTIMEO,        // 接收超时recv() timeout
+   // 地址复用
+   UDT_REUSEADDR,	      // 地址复用，reuse an existing port or create a new one
+   // 最大带宽
+   UDT_MAXBW,		      // 最大带宽，maximum bandwidth (bytes per second) that the connection can use
+   // 套接字状态
+   UDT_STATE,		      // 套接字状态，current socket state, see UDTSTATUS, read only
+   // 套接字相关的事件
+   UDT_EVENT,		      // 套接字相关的事件，current avalable events associated with the socket
+   // 发送缓冲区中的数据大小
+   UDT_SNDDATA,		   // 发送缓冲区中的数据大小，size of data in the sending buffer
+   // 接收缓冲区的数据大小
+   UDT_RCVDATA		      // 接收缓冲区的数据大小，size of data available for recv
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,40 +190,71 @@ enum UDTOpt
 struct CPerfMon
 {
    // global measurements
+   // 子UDT实例启动以来的时间戳,ms
    int64_t msTimeStamp;                 // time since the UDT entity is started, in milliseconds
+   // 发送的数据包总数，包括重传
    int64_t pktSentTotal;                // total number of sent data packets, including retransmissions
+   // 接收到的包总数
    int64_t pktRecvTotal;                // total number of received packets
+   // 发送端丢失的包总数
    int pktSndLossTotal;                 // total number of lost packets (sender side)
+   // 接收端丢失的包总数
    int pktRcvLossTotal;                 // total number of lost packets (receiver side)
+   // 重传的包总数
    int pktRetransTotal;                 // total number of retransmitted packets
+   // 发送的ACK包总数
    int pktSentACKTotal;                 // total number of sent ACK packets
+   // 接收到的ACK包总数
    int pktRecvACKTotal;                 // total number of received ACK packets
+   // 发送的NAK包总数
    int pktSentNAKTotal;                 // total number of sent NAK packets
+   // 接收到的NAK包总数
    int pktRecvNAKTotal;                 // total number of received NAK packets
+   // UDT发送数据的总时间（不包括空闲时间）
    int64_t usSndDurationTotal;		// total time duration when UDT is sending data (idle time exclusive)
 
    // local measurements
+   // 发送的数据包数，包括重传
    int64_t pktSent;                     // number of sent data packets, including retransmissions
+   // 接收到的包数
    int64_t pktRecv;                     // number of received packets
+   // 发送端丢失的包数
    int pktSndLoss;                      // number of lost packets (sender side)
+   // 接收端丢失的包数
    int pktRcvLoss;                      // number of lost packets (receiver side)
+   // 重传的包数
    int pktRetrans;                      // number of retransmitted packets
+   // 发送的ACK包数
    int pktSentACK;                      // number of sent ACK packets
+   // 接收到的ACK包数
    int pktRecvACK;                      // number of received ACK packets
+   // 发送的NAK包数
    int pktSentNAK;                      // number of sent NAK packets
+   // 接收到的NAK包数
    int pktRecvNAK;                      // number of received NAK packets
+   // 发送速率，单位为Mb/s
    double mbpsSendRate;                 // sending rate in Mb/s
+   // 接收速率，单位为Mb/s
    double mbpsRecvRate;                 // receiving rate in Mb/s
+   // 忙碌发送时间（不包括空闲时间)
    int64_t usSndDuration;		// busy sending time (i.e., idle time exclusive)
 
    // instant measurements
+   // 包发送周期，以微秒为单位
    double usPktSndPeriod;               // packet sending period, in microseconds
+   // 流窗口大小，以包数为单位
    int pktFlowWindow;                   // flow window size, in number of packets
+   // 拥塞窗口大小，以包数为单位
    int pktCongestionWindow;             // congestion window size, in number of packets
+   // 传输中的包数
    int pktFlightSize;                   // number of packets on flight
+   // RTT，以毫秒为单位
    double msRTT;                        // RTT, in milliseconds
+   // 估计的带宽，以Mb/s为单位
    double mbpsBandwidth;                // estimated bandwidth, in Mb/s
+   // 可用的UDT发送缓冲区大小
    int byteAvailSndBuf;                 // available UDT sender buffer size
+   // 可用的UDT接收缓冲区大小
    int byteAvailRcvBuf;                 // available UDT receiver buffer size
 };
 
@@ -311,6 +373,7 @@ UDT_API extern const int ERROR;
 
 UDT_API int startup();
 UDT_API int cleanup();
+// 创建一个新socket，注意:返回的并不是实际的sockfd，而是sockfd对应的唯一标识符，是一个随机值
 UDT_API UDTSOCKET socket(int af, int type, int protocol);
 UDT_API int bind(UDTSOCKET u, const struct sockaddr* name, int namelen);
 UDT_API int bind2(UDTSOCKET u, UDPSOCKET udpsock);

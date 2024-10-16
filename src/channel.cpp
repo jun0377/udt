@@ -218,6 +218,7 @@ void CChannel::setRcvBufSize(int size)
 void CChannel::getSockAddr(sockaddr* addr) const
 {
    socklen_t namelen = m_iSockAddrSize;
+   // 调用系统API
    ::getsockname(m_iSocket, addr, &namelen);
 }
 

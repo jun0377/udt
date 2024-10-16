@@ -173,6 +173,7 @@ private:
    int m_iIPversion;                    // IP version
    int m_iSockAddrSize;                 // socket address structure size (pre-defined to avoid run-time test)
 
+   // UDP系统套接字
    UDPSOCKET m_iSocket;                 // socket descriptor
 
    int m_iSndBufSize;                   // UDP sending buffer size

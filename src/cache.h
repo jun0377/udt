@@ -90,12 +90,14 @@ public:
    m_iCurrSize(0)
    {
       m_vHashPtr.resize(m_iHashSize);
+      // 初始化锁
       CGuard::createMutex(m_Lock);
    }
 
    ~CCache()
    {
       clear();
+      // 销毁锁
       CGuard::releaseMutex(m_Lock);
    }
 
@@ -107,16 +109,20 @@ public:
       // Returned value:
       //    0 if found a match, otherwise -1.
 
+   // 从缓存中查找匹配项，拷贝数据到data中
    int lookup(T* data)
    {
+      // 类似C++11中的lock_guard
       CGuard cacheguard(m_Lock);
 
+      // 获取key值
       int key = data->getKey();
       if (key < 0)
          return -1;
       if (key >= m_iMaxSize)
          key %= m_iHashSize;
 
+      // 找到匹配的list,list中存储的是迭代器
       const ItemPtrList& item_list = m_vHashPtr[key];
       for (typename ItemPtrList::const_iterator i = item_list.begin(); i != item_list.end(); ++ i)
       {
@@ -138,10 +144,13 @@ public:
       // Returned value:
       //    0 if success, otherwise -1.
 
+   // 更新缓存中的项，或者插入一个不存在的项；最旧的项目可能会被删除
    int update(T* data)
    {
+      // 类似C++11中的lock_guard
       CGuard cacheguard(m_Lock);
 
+      // 获取key值
       int key = data->getKey();
       if (key < 0)
          return -1;
@@ -150,9 +159,11 @@ public:
 
       T* curr = NULL;
 
+      // 找到匹配的list,list中存储的是迭代器
       ItemPtrList& item_list = m_vHashPtr[key];
       for (typename ItemPtrList::iterator i = item_list.begin(); i != item_list.end(); ++ i)
       {
+         // 如果key对应的数据已存在，则删除之，并将新数据插入到最前面
          if (*data == ***i)
          {
             // update the existing entry with the new value
@@ -177,6 +188,7 @@ public:
       item_list.push_front(m_StorageList.begin());
 
       ++ m_iCurrSize;
+      // 缓冲容量超出限制，则删除旧的数据
       if (m_iCurrSize >= m_iMaxSize)
       {
          // Cache overflow, remove oldest entry.
@@ -209,6 +221,7 @@ public:
       // Returned value:
       //    None.
 
+   // 指定缓存大小（即，最大条目数）
    void setSizeLimit(int size)
    {
       m_iMaxSize = size;
@@ -223,6 +236,7 @@ public:
       // Returned value:
       //    None.
 
+   // 清除缓存中的所有条目，恢复到初始化状态
    void clear()
    {
       for (typename std::list<T*>::iterator i = m_StorageList.begin(); i != m_StorageList.end(); ++ i)
@@ -237,19 +251,27 @@ public:
    }
 
 private:
+   // 存储指针的链表
    std::list<T*> m_StorageList;
+   // 声明一个新的类型ItemPtr，它是一个指向m_StorageList中的某一个节点的迭代器
    typedef typename std::list<T*>::iterator ItemPtr;
+   // 生命一个新的类型ItemPtrList，它是一个链表，存储着链表迭代器
    typedef std::list<ItemPtr> ItemPtrList;
+   // 存储着m_StorageList中每个节点的入口entry
    std::vector<ItemPtrList> m_vHashPtr;
 
+   // 缓存最大大小
    int m_iMaxSize;
+   // 哈希表，为什么要是m_iMaxSize的三倍？
    int m_iHashSize;
    int m_iCurrSize;
 
    pthread_mutex_t m_Lock;
 
 private:
+   // 重载拷贝构造函数
    CCache(const CCache&);
+   // 重载赋值运算符 
    CCache& operator=(const CCache&);
 };
 

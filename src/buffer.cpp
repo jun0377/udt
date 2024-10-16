@@ -57,12 +57,16 @@ m_iMSS(mss),
 m_iCount(0)
 {
    // initial physical buffer of "size"
+   // 堆内存
    m_pBuffer = new Buffer;
+   // 实际分配的内存 = 数据块个数m_iSize * 最大包大小m_iMSS
    m_pBuffer->m_pcData = new char [m_iSize * m_iMSS];
+   // 数据块个数
    m_pBuffer->m_iSize = m_iSize;
    m_pBuffer->m_pNext = NULL;
 
    // circular linked list for out bound packets
+   // 循环链表，链表中的每个节点都是一个数据块
    m_pBlock = new Block;
    Block* pb = m_pBlock;
    for (int i = 1; i < m_iSize; ++ i)
@@ -74,16 +78,20 @@ m_iCount(0)
    pb->m_pNext = m_pBlock;
 
    pb = m_pBlock;
+
+   // 循环链表中的指针，指向真实的堆内存
    char* pc = m_pBuffer->m_pcData;
    for (int i = 0; i < m_iSize; ++ i)
    {
       pb->m_pcData = pc;
       pb = pb->m_pNext;
-      pc += m_iMSS;
+      pc += m_iMSS;     // 指针便宜到下一个数据块
    }
 
+   // 初始化数据块指针都指向申请的堆内存起始位置
    m_pFirstBlock = m_pCurrBlock = m_pLastBlock = m_pBlock;
 
+   // 初始化锁
    #ifndef WIN32
       pthread_mutex_init(&m_BufLock, NULL);
    #else
@@ -93,6 +101,7 @@ m_iCount(0)
 
 CSndBuffer::~CSndBuffer()
 {
+   // 释放堆内存
    Block* pb = m_pBlock->m_pNext;
    while (pb != m_pBlock)
    {
@@ -110,6 +119,7 @@ CSndBuffer::~CSndBuffer()
       delete temp;
    }
 
+   // 销毁锁
    #ifndef WIN32
       pthread_mutex_destroy(&m_BufLock);
    #else
@@ -119,11 +129,13 @@ CSndBuffer::~CSndBuffer()
 
 void CSndBuffer::addBuffer(const char* data, int len, int ttl, bool order)
 {
+   // 计算要插入的数据需要占用多少数据块
    int size = len / m_iMSS;
    if ((len % m_iMSS) != 0)
       size ++;
 
    // dynamically increase sender buffer
+   // 动态增大发送缓冲区
    while (size + m_iCount >= m_iSize)
       increase();
 
@@ -282,6 +294,7 @@ int CSndBuffer::getCurrBufSize() const
    return m_iCount;
 }
 
+// 动态增大发送缓冲区
 void CSndBuffer::increase()
 {
    int unitsize = m_pBuffer->m_iSize;

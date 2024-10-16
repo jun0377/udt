@@ -38,25 +38,28 @@ int main(int argc, char* argv[])
 
    memset(&hints, 0, sizeof(struct addrinfo));
 
-   hints.ai_flags = AI_PASSIVE;     // 获取地址信息时可使用 IP 地址或域名
-   hints.ai_family = AF_INET;       // IPV4
-   hints.ai_socktype = SOCK_STREAM;
+   hints.ai_flags = AI_PASSIVE;        // 当设置了AI_PASSIVE时，返回的套接口地址为INADDR_ANY
+   hints.ai_family = AF_INET;          // IPV4
+   hints.ai_socktype = SOCK_STREAM;    // TCP
    //hints.ai_socktype = SOCK_DGRAM;
 
-   // 服务器监听的端口
+   // 服务器监听的端口,可通过命令行传入
    string service("9000");
    if (2 == argc)
       service = argv[1];
 
-   // 检测端口是否可用
+   std::cout << "[main] listen port: " << service << std::endl;
+
+   // 获取用于创建套接字的地址信息,使用这个函数，当端口号超出65535时，实际使用的端口号将是对65536取模后的值
    if (0 != getaddrinfo(NULL, service.c_str(), &hints, &res))
    {
-      cout << "illegal port number or port is busy.\n" << endl;
+      cout << "[main] illegal port number or port is busy.\n" << endl;
       return 0;
    }
 
    // socket,这一步实际上并没有执行系统socket函数，只是初始化了一些参数
    UDTSOCKET serv = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+   std::cout << "[main] sockfd: " << serv << std::endl;
 
    // UDT Options
    //UDT::setsockopt(serv, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
@@ -67,18 +70,18 @@ int main(int argc, char* argv[])
    // bind
    if (UDT::ERROR == UDT::bind(serv, res->ai_addr, res->ai_addrlen))
    {
-      cout << "bind: " << UDT::getlasterror().getErrorMessage() << endl;
+      cout << "[main] bind: " << UDT::getlasterror().getErrorMessage() << endl;
       return 0;
    }
 
    freeaddrinfo(res);
 
-   cout << "server is ready at port: " << service << endl;
+   cout << "[main] server is ready at port: " << service << endl;
 
    // listen,并没有执行什么特殊操作，只是设置了一下listener
    if (UDT::ERROR == UDT::listen(serv, 10))
    {
-      cout << "listen: " << UDT::getlasterror().getErrorMessage() << endl;
+      cout << "[main] listen: " << UDT::getlasterror().getErrorMessage() << endl;
       return 0;
    }
 
@@ -92,7 +95,7 @@ int main(int argc, char* argv[])
       // accept
       if (UDT::INVALID_SOCK == (recver = UDT::accept(serv, (sockaddr*)&clientaddr, &addrlen)))
       {
-         cout << "accept: " << UDT::getlasterror().getErrorMessage() << endl;
+         cout << "[main] accept: " << UDT::getlasterror().getErrorMessage() << endl;
          return 0;
       }
 
@@ -101,7 +104,7 @@ int main(int argc, char* argv[])
 
       // 将IP地址和端口转换为主机名和服务名
       getnameinfo((sockaddr *)&clientaddr, addrlen, clienthost, sizeof(clienthost), clientservice, sizeof(clientservice), NI_NUMERICHOST|NI_NUMERICSERV);
-      cout << "new connection: " << clienthost << ":" << clientservice << endl;
+      cout << "[main] new connection: " << clienthost << ":" << clientservice << endl;
 
       // 接收客户端数据
       #ifndef WIN32

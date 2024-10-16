@@ -63,6 +63,7 @@ public:
       // Returned value:
       //    None.
 
+   // 向发送列表中插入一个用户数据块
    void addBuffer(const char* data, int len, int ttl = -1, bool order = false);
 
       // Functionality:
@@ -73,6 +74,7 @@ public:
       // Returned value:
       //    actual size of data added from the file.
 
+   //从文件中读取数据块并插入到发送列表中
    int addBufferFromFile(std::fstream& ifs, int len);
 
       // Functionality:
@@ -83,6 +85,7 @@ public:
       // Returned value:
       //    Actual length of data read.
 
+   // 从发送列表中读取数据块
    int readData(char** data, int32_t& msgno);
 
       // Functionality:
@@ -95,6 +98,7 @@ public:
       // Returned value:
       //    Actual length of data read.
 
+   // 找到数据块位置，以用于重传
    int readData(char** data, const int offset, int32_t& msgno, int& msglen);
 
       // Functionality:
@@ -104,6 +108,7 @@ public:
       // Returned value:
       //    None.
 
+   // 更新ACK点，并根据标志释放/取消映射/返回用户数据
    void ackData(int offset);
 
       // Functionality:
@@ -113,21 +118,29 @@ public:
       // Returned value:
       //    Current size of the data in the sending list.
 
+   // 发送队列中的数据大小
    int getCurrBufSize() const;
 
 private:
+   // 动态增大发送缓冲区
    void increase();
 
 private:
+   // 用于同步操作
    pthread_mutex_t m_BufLock;           // used to synchronize buffer operation
 
    struct Block
    {
+      // 指向数据块的指针
       char* m_pcData;                   // pointer to the data block
+      // 数据块大小
       int m_iLength;                    // length of the block
 
+      // 数据标志
       int32_t m_iMsgNo;                 // message number
+      // 数据请求时间
       uint64_t m_OriginTime;            // original request time
+      // 数据生存时间，ms
       int m_iTTL;                       // time to live (milliseconds)
 
       Block* m_pNext;                   // next block
@@ -147,13 +160,19 @@ private:
 
    int32_t m_iNextMsgNo;                // next message number
 
+   // 实际分配的内存 = 数据块个数m_iSize * 最大包大小m_iMSS
+   // 数据块的个数
    int m_iSize;				// buffer size (number of packets)
+   // 最大报文段/最大包大小
    int m_iMSS;                          // maximum seqment/packet size
 
+   // 已使用的数据块
    int m_iCount;			// number of used blocks
 
 private:
+   // 仅声明未实现，相当于删除了拷贝构造函数
    CSndBuffer(const CSndBuffer&);
+   // 仅声明未实现，相当于仅用了拷贝赋值操作
    CSndBuffer& operator=(const CSndBuffer&);
 };
 

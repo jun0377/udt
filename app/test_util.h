@@ -7,6 +7,7 @@ struct UDTUpDown{
    UDTUpDown()
    {
       // use this function to initialize the UDT library
+      // 初始化UDT
       UDT::startup();
    }
    ~UDTUpDown()

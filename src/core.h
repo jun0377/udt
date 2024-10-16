@@ -350,7 +350,9 @@ private: // Status
    int64_t m_llLastReqTime;			// last time when a connection request is sent
 
 private: // Sending related data
+   // 发送缓冲区
    CSndBuffer* m_pSndBuffer;                    // Sender buffer
+   // 
    CSndLossList* m_pSndLossList;                // Sender loss list
    CPktTimeWindow* m_pSndTimeWindow;            // Packet sending time window
 
@@ -372,6 +374,7 @@ private: // Sending related data
    void CCUpdate();
 
 private: // Receiving related data
+   // 接收缓冲区
    CRcvBuffer* m_pRcvBuffer;                    // Receiver buffer
    CRcvLossList* m_pRcvLossList;                // Receiver loss list
    CACKWindow* m_pACKWindow;                    // ACK history window

@@ -133,6 +133,7 @@ m_GCThread(),
 m_ClosedSockets()
 {
    // Socket ID MUST start from a random value
+   // Socket ID 从一个随机值开始
    srand((unsigned int)CTimer::getTime());
    m_SocketID = 1 + (int)((1 << 30) * (double(rand()) / RAND_MAX));
 
@@ -181,6 +182,7 @@ CUDTUnited::~CUDTUnited()
 
 int CUDTUnited::startup()
 {
+   // lock_guard
    CGuard gcinit(m_InitLock);
 
    // 只允许有一个udt实例,此处应当使用单例模式来实现
@@ -292,10 +294,12 @@ UDTSOCKET CUDTUnited::newSocket(int af, int type)
       throw CUDTException(3, 2, 0);
    }
 
+   // 保存UDT套接字m_SocketID,是一个随机值
    CGuard::enterCS(m_IDLock);
    ns->m_SocketID = -- m_SocketID;
    CGuard::leaveCS(m_IDLock);
 
+   // UDT套接字状态：INIT
    ns->m_Status = INIT;
    ns->m_ListenSocket = 0;
    
@@ -306,10 +310,10 @@ UDTSOCKET CUDTUnited::newSocket(int af, int type)
    ns->m_pUDT->m_pCache = m_pCache;
 
    // protect the m_Sockets structure.
+   // 使用一个map来保存UDT套接字
    CGuard::enterCS(m_ControlLock);
    try
    {
-      // map: key = m_SocketID,是一个随机值；val = 新创建的sockfd
       m_Sockets[ns->m_SocketID] = ns;
    }
    catch (...)
@@ -513,15 +517,16 @@ UDTSTATUS CUDTUnited::getStatus(const UDTSOCKET u)
 
 int CUDTUnited::bind(const UDTSOCKET u, const sockaddr* name, int namelen)
 {
-   // 根据socket id查找CUDTSocket实例
+   // 从map中查找UDT套接字
    CUDTSocket* s = locate(u);
    if (NULL == s)
       throw CUDTException(5, 4, 0);
 
+   // lock_guard
    CGuard cg(s->m_ControlLock);
 
    // cannot bind a socket more than once
-   // 只有处于INIT状态的socket才可以绑定
+   // 状态机：只有处于INIT状态的socket才可以绑定
    if (INIT != s->m_Status)
       throw CUDTException(5, 0, 0);
 
@@ -538,9 +543,11 @@ int CUDTUnited::bind(const UDTSOCKET u, const sockaddr* name, int namelen)
          throw CUDTException(5, 3, 0);
    }
 
-   // 初始化sockfd相关属性
-   s->m_pUDT->open();         // open一个UDT实例
-   updateMux(s, name);        // 多路复用器，不理解
+   // 开启一个UDT连接
+   s->m_pUDT->open();
+   // 更新多路复用器，这是个什么玩意儿？
+   updateMux(s, name);
+   // 状态机：INIT -> OPENED
    s->m_Status = OPENED;
 
    // copy address information of local node
@@ -1648,6 +1655,7 @@ UDTSOCKET CUDT::socket(int af, int type, int)
    }
 }
 
+// CUDT的静态成员函数
 int CUDT::bind(UDTSOCKET u, const sockaddr* name, int namelen)
 {
    try

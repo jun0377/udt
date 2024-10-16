@@ -81,7 +81,9 @@ const int CUDT::m_iSelfClockInterval = 64;
 
 CUDT::CUDT()
 {
+   // 发送缓冲区
    m_pSndBuffer = NULL;
+   // 接收缓冲区
    m_pRcvBuffer = NULL;
    m_pSndLossList = NULL;
    m_pRcvLossList = NULL;
