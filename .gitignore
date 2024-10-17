@@ -3,3 +3,11 @@
 **/libudt.so
 **/libudt.a
 **/*proj
+.vs
+ClassDiagram.cd
+ClassDiagram1.cd
+UDT.sln
+UDT.vcxproj.filters
+UDT.vcxproj.user
+x64
+

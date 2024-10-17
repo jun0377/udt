@@ -1,0 +1,8 @@
+
+# 设置以下文件的换行符为LF
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
