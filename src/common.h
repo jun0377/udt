@@ -79,7 +79,7 @@ public:
       // Returned value:
       //    None.
 
-   // 休眠多少个时钟周期
+   // 休眠一段时间
    void sleep(uint64_t interval);
 
       // Functionality:
@@ -89,7 +89,7 @@ public:
       // Returned value:
       //    None.
 
-   // 休眠到的时间点，同样以时钟周期来衡量
+   // 休眠到下一个时间点
    void sleepto(uint64_t nexttime);
 
       // Functionality:
@@ -120,7 +120,8 @@ public:
       //    0) [out] x: to record cpu clock cycles.
       // Returned value:
       //    None.
-   // 获取高精度时间戳：系统启动以来经过了多少个CPU时钟
+      
+   // 可以简单认为是获取us级时间戳
    static void rdtsc(uint64_t &x);
 
       // Functionality:
@@ -134,13 +135,13 @@ public:
    static uint64_t getCPUFrequency();
 
       // Functionality:
-      //    check the current time, 64bit, in microseconds.
+      //    check the current time, 64bit, in microseconds.(明明获取的是us，这个注释应该有误)
       // Parameters:
       //    None.
       // Returned value:
       //    current time in microseconds.
 
-   // 当前时间戳，ms
+   // 获取当前时间的us级时间戳
    static uint64_t getTime();
 
       // Functionality:
@@ -150,7 +151,7 @@ public:
       // Returned value:
       //    None.
 
-   // 触发一个事件
+   // 唤醒条件变量，触发一个事件
    static void triggerEvent();
 
       // Functionality:
@@ -160,7 +161,7 @@ public:
       // Returned value:
       //    None.
 
-   // 等待事件
+   // 阻塞等待，最多等待10ms
    static void waitForEvent();
 
       // Functionality:
@@ -170,15 +171,15 @@ public:
       // Returned value:
       //    None.
 
-   // 用于对时间不敏感的休眠
+   // 简单休眠10us 
    static void sleep();
 
 private:
-   // 时间戳,us
+   // 时间戳,us   Q;怎么没有实现这个函数呢？
    uint64_t getTimeInMicroSec();
 
 private:
-   // 休眠到的时间点
+   // 记录tick时间，ull = unsigned long long
    uint64_t m_ullSchedTime;             // next schedulled time
 
    // tick的条件变量和锁

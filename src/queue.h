@@ -147,10 +147,12 @@ private:
 
 struct CSNode
 {
-   // CUDT实例
+   // 关联的CUDT实例
    CUDT* m_pUDT;		// Pointer to the instance of CUDT socket
+   // 时间戳
    uint64_t m_llTimeStamp;      // Time Stamp
 
+   // 在堆中的位置
    int m_iHeapLoc;		// location on the heap, -1 means not on the heap
 };
 
@@ -171,7 +173,8 @@ public:
       //    2) [in] u: pointer to the UDT instance
       // Returned value:
       //    None.
-
+   
+   // 向堆中插入一个新的UDT实例
    void insert(int64_t ts, const CUDT* u);
 
       // Functionality:
@@ -182,6 +185,7 @@ public:
       // Returned value:
       //    None.
 
+   // 更新UDT实例的时间戳，有什么用？
    void update(const CUDT* u, bool reschedule = true);
 
       // Functionality:
@@ -201,6 +205,7 @@ public:
       // Returned value:
       //    None.
 
+   // 删除UDT实例
    void remove(const CUDT* u);
 
       // Functionality:
@@ -210,20 +215,28 @@ public:
       // Returned value:
       //    Scheduled processing time of the first UDT socket in the list.
 
+   // 获取堆顶元素的时间戳
    uint64_t getNextProcTime();
 
 private:
+   // 插入数据到堆中
    void insert_(int64_t ts, const CUDT* u);
+   // 从堆中删除数据
    void remove_(const CUDT* u);
 
 private:
+   // 待发送数据，使用一个小根堆来实现
    CSNode** m_pHeap;			// The heap array
+   // 堆中的节点个数
    int m_iArrayLength;			// physical length of the array
+   // 最新一个节点的位置
    int m_iLastEntry;			// position of last entry on the heap array
 
+   // 同步访问保护
    pthread_mutex_t m_ListLock;
 
    pthread_mutex_t* m_pWindowLock;
+
    pthread_cond_t* m_pWindowCond;
 
    CTimer* m_pTimer;

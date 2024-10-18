@@ -254,9 +254,11 @@ CSndUList::~CSndUList()
 
 void CSndUList::insert(int64_t ts, const CUDT* u)
 {
+   // lock_guard
    CGuard listguard(m_ListLock);
 
    // increase the heap array size if necessary
+   // 堆已满，动态增加堆空间，成倍增加
    if (m_iLastEntry == m_iArrayLength - 1)
    {
       CSNode** temp = NULL;
@@ -275,21 +277,27 @@ void CSndUList::insert(int64_t ts, const CUDT* u)
       delete [] m_pHeap;
       m_pHeap = temp;
    }
-
+   
+   // 将数据插入到堆中
    insert_(ts, u);
 }
 
 void CSndUList::update(const CUDT* u, bool reschedule)
 {
+   // lock_guard
    CGuard listguard(m_ListLock);
 
+   // 获取UDT实例中的待发送数据
    CSNode* n = u->m_pSNode;
 
+   // n->m_iHeapLoc >= 0说明该UDT实例的待发送数据已经存在于堆中
    if (n->m_iHeapLoc >= 0)
    {
+      // 不需要重新调度，直接返回
       if (!reschedule)
          return;
 
+      // 如果UDT实例是堆顶元素，则...
       if (n->m_iHeapLoc == 0)
       {
          n->m_llTimeStamp = 1;
@@ -297,38 +305,51 @@ void CSndUList::update(const CUDT* u, bool reschedule)
          return;
       }
 
+      // 如果UDT实例不是堆顶元素，先将其从堆中删除
       remove_(u);
    }
 
+   // 更新时间戳后，重新将UDT实例放入堆中
+   // Q:这里将时间戳设置为1是什么意思？？？
    insert_(1, u);
 }
 
 int CSndUList::pop(sockaddr*& addr, CPacket& pkt)
 {
+   // lock_guard
    CGuard listguard(m_ListLock);
 
+   // 堆中没有数据，直接返回
    if (-1 == m_iLastEntry)
       return -1;
 
    // no pop until the next schedulled time
+   // 获取当前时间戳
    uint64_t ts;
    CTimer::rdtsc(ts);
+   // 如果当前时间戳比发送数据的时间戳小，直接返回
    if (ts < m_pHeap[0]->m_llTimeStamp)
       return -1;
 
+   // 获取堆顶元素对应的UDT实例
    CUDT* u = m_pHeap[0]->m_pUDT;
+   // 删除堆顶元素
    remove_(u);
 
+   // 如果链接异常，直接返回
    if (!u->m_bConnected || u->m_bBroken)
       return -1;
 
    // pack a packet from the socket
+   // 数据打包
    if (u->packData(pkt, ts) <= 0)
       return -1;
 
+   // 取出UDT实例对应的对端地址
    addr = u->m_pPeerAddr;
 
    // insert a new entry, ts is the next processing time
+   // Q:这个逻辑有什么用？
    if (ts > 0)
       insert_(ts, u);
 
@@ -337,6 +358,7 @@ int CSndUList::pop(sockaddr*& addr, CPacket& pkt)
 
 void CSndUList::remove(const CUDT* u)
 {
+   // lock_guard
    CGuard listguard(m_ListLock);
 
    remove_(u);
@@ -344,26 +366,33 @@ void CSndUList::remove(const CUDT* u)
 
 uint64_t CSndUList::getNextProcTime()
 {
+   // lock_guard
    CGuard listguard(m_ListLock);
-
+   
+   // 堆为空，直接返回
    if (-1 == m_iLastEntry)
       return 0;
 
+   // 返回堆顶元素时间戳
    return m_pHeap[0]->m_llTimeStamp;
 }
 
 void CSndUList::insert_(int64_t ts, const CUDT* u)
 {
+   // 取出UDT实例中的待发送数据
    CSNode* n = u->m_pSNode;
 
    // do not insert repeated node
+   // 如果待发送数据已经存在于堆中，则直接返回
    if (n->m_iHeapLoc >= 0)
       return;
 
+   // 插入数据到堆中
    m_iLastEntry ++;
    m_pHeap[m_iLastEntry] = n;
    n->m_llTimeStamp = ts;
 
+   // 小根堆调整，按时间戳调整
    int q = m_iLastEntry;
    int p = q;
    while (p != 0)
@@ -381,13 +410,17 @@ void CSndUList::insert_(int64_t ts, const CUDT* u)
          break;
    }
 
+   // 更新待发送数据在堆中的位置
    n->m_iHeapLoc = q;
 
    // an earlier event has been inserted, wake up sending worker
-   if (n->m_iHeapLoc == 0)
+   // 新插入的数据比堆顶的时间戳都要早，需要立即发送
+   if (n->m_iHeapLoc == 0){
       m_pTimer->interrupt();
+   }
 
    // first entry, activate the sending queue
+   // 第一次执行到此处时，唤醒发送队列
    if (0 == m_iLastEntry)
    {
       #ifndef WIN32
@@ -402,15 +435,19 @@ void CSndUList::insert_(int64_t ts, const CUDT* u)
 
 void CSndUList::remove_(const CUDT* u)
 {
+   // 获取UDT实例待发送数据
    CSNode* n = u->m_pSNode;
 
+   // UDT实例中的待发送数据仍然在堆中
    if (n->m_iHeapLoc >= 0)
    {
       // remove the node from heap
+      // 从堆中删除该节点
       m_pHeap[n->m_iHeapLoc] = m_pHeap[m_iLastEntry];
       m_iLastEntry --;
       m_pHeap[n->m_iHeapLoc]->m_iHeapLoc = n->m_iHeapLoc;
 
+      // 删除元素后重新调整堆结构
       int q = n->m_iHeapLoc;
       int p = q * 2 + 1;
       while (p <= m_iLastEntry)
@@ -433,10 +470,12 @@ void CSndUList::remove_(const CUDT* u)
             break;
       }
 
+      // 更新待发送数据在堆中的位置，-1表示不在堆中
       n->m_iHeapLoc = -1;
    }
 
    // the only event has been deleted, wake up immediately
+   // 堆中数据为空？？？
    if (0 == m_iLastEntry)
       m_pTimer->interrupt();
 }

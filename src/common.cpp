@@ -98,6 +98,7 @@ void CTimer::rdtsc(uint64_t &x)
    // 是否使用us级时间戳，gettimeofday就可以提供微秒级时间戳，不必通过cpu时钟周期来计算
    if (m_bUseMicroSecond)
    {
+      // 获取us级时间戳
       x = getTime();
       return;
    }
@@ -230,6 +231,7 @@ void CTimer::sleepto(uint64_t nexttime)
    }
 }
 
+// 定时器中断，记录当前时间戳，并唤醒条件变量
 void CTimer::interrupt()
 {
    // schedule the sleepto time to the current CCs, so that it will stop
@@ -237,6 +239,7 @@ void CTimer::interrupt()
    tick();
 }
 
+// 唤醒条件变量，触发一次定时器时间
 void CTimer::tick()
 {
    #ifndef WIN32
@@ -246,6 +249,7 @@ void CTimer::tick()
    #endif
 }
 
+// 获取us级时间戳
 uint64_t CTimer::getTime()
 {
    //For Cygwin and other systems without microsecond level resolution, uncomment the following three lines
@@ -277,6 +281,7 @@ uint64_t CTimer::getTime()
    #endif
 }
 
+// 唤醒条件变量，触发一次事件
 void CTimer::triggerEvent()
 {
    #ifndef WIN32
@@ -286,6 +291,7 @@ void CTimer::triggerEvent()
    #endif
 }
 
+// 阻塞等待，最多等待10ms
 void CTimer::waitForEvent()
 {
    #ifndef WIN32
@@ -293,18 +299,21 @@ void CTimer::waitForEvent()
       timespec timeout;
       gettimeofday(&now, 0);
 
-      // 设置一个10ms的timeout
-      // 超过10^6us时，需要向秒进位
+      // 设置一个10ms的超时时间，需要处理向秒进位的情况
       if (now.tv_usec < 990000)
       {
+         // 不必向秒进位的情况
          timeout.tv_sec = now.tv_sec;
          timeout.tv_nsec = (now.tv_usec + 10000) * 1000;
       }
       else
       {
+         // 需要向秒进位的情况
          timeout.tv_sec = now.tv_sec + 1;
          timeout.tv_nsec = (now.tv_usec + 10000 - 1000000) * 1000;
       }
+      
+      // 带有超时时间的条件变量，阻塞等待
       pthread_mutex_lock(&m_EventLock);
       pthread_cond_timedwait(&m_EventCond, &m_EventLock, &timeout);
       pthread_mutex_unlock(&m_EventLock);
