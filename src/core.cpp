@@ -2286,18 +2286,22 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
    }
 }
 
+// 打包成UDT报文
 int CUDT::packData(CPacket& packet, uint64_t& ts)
 {
    int payload = 0;
    bool probe = false;
 
+   // 获取当前时间戳
    uint64_t entertime;
    CTimer::rdtsc(entertime);
 
+   // 计算当前时间到下一次发送的时间间隔
    if ((0 != m_ullTargetTime) && (entertime > m_ullTargetTime))
       m_ullTimeDiff += entertime - m_ullTargetTime;
 
    // Loss retransmission always has higher priority.
+   // 丢包重传优先级最高
    if ((packet.m_iSeqNo = m_pSndLossList->getLostSeq()) >= 0)
    {
       // protect m_iSndLastDataAck from updating by ACK processing

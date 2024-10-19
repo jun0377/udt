@@ -64,6 +64,7 @@ written by
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// 实现了一种可以被中断的定时器
 class CTimer
 {
 public:
@@ -99,7 +100,7 @@ public:
       // Returned value:
       //    None.
 
-   // 到达下一个时间点后，触发一次tick事件
+   // 更新下一次调度时间为当前时间，听过调用tick()立即退出休眠
    void interrupt();
 
       // Functionality:
@@ -109,7 +110,7 @@ public:
       // Returned value:
       //    None.
 
-   // 触发事件
+   // 解除sleep()和sleepto()中可能存在的阻塞
    void tick();
 
 public:
@@ -179,7 +180,7 @@ private:
    uint64_t getTimeInMicroSec();
 
 private:
-   // 记录tick时间，ull = unsigned long long
+   // 下一次调度时间，ull = unsigned long long
    uint64_t m_ullSchedTime;             // next schedulled time
 
    // tick的条件变量和锁

@@ -184,16 +184,20 @@ void CTimer::sleep(uint64_t interval)
    sleepto(t + interval);
 }
 
+// sleepto实现了基于条件变量和时钟周期的休眠机制
 void CTimer::sleepto(uint64_t nexttime)
 {
    // Use class member such that the method can be interrupted by others
+   // 更新下一次调度时间
    m_ullSchedTime = nexttime;
 
    uint64_t t;
    rdtsc(t);
 
+   // 尚未达到下一次调度时间
    while (t < m_ullSchedTime)
    {
+      // 通过执行空操作来实现延时，即：忙等
       #ifndef NO_BUSY_WAITING
          #ifdef IA32
             __asm__ volatile ("pause; rep; nop; nop; nop; nop; nop;");
@@ -202,6 +206,7 @@ void CTimer::sleepto(uint64_t nexttime)
          #elif AMD64
             __asm__ volatile ("nop; nop; nop; nop; nop;");
          #endif
+      // 通过条件变量来实现非忙等待
       #else
          #ifndef WIN32
             timeval now;
@@ -219,6 +224,8 @@ void CTimer::sleepto(uint64_t nexttime)
                timeout.tv_sec = now.tv_sec + 1;
                timeout.tv_nsec = (now.tv_usec + 10000 - 1000000) * 1000;
             }
+
+            // 带有超时时间的条件变量
             pthread_mutex_lock(&m_TickLock);
             pthread_cond_timedwait(&m_TickCond, &m_TickLock, &timeout);
             pthread_mutex_unlock(&m_TickLock);

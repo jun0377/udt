@@ -46,6 +46,7 @@ written by
 #include "common.h"
 
 
+// 传输中丢的包，用于重传
 class CSndLossList
 {
 public:
@@ -60,6 +61,7 @@ public:
       // Returned value:
       //    number of packets that are not in the list previously.
 
+   // 向发送丢包list中插入序列号
    int insert(int32_t seqno1, int32_t seqno2);
 
       // Functionality:
@@ -90,18 +92,25 @@ public:
    int32_t getLostSeq();
 
 private:
+   // 序列号起始
    int32_t* m_piData1;                  // sequence number starts
+   // 序列号结束
    int32_t* m_piData2;                  // seqnence number ends
+   // 下一个节点
    int* m_piNext;                       // next node in the list
 
+   // list中的第一个节点
    int m_iHead;                         // first node
+   // 
    int m_iLength;                       // loss length
+   // 静态数组的大小
    int m_iSize;                         // size of the static array
    int m_iLastInsertPos;                // position of last insert node
 
    pthread_mutex_t m_ListLock;          // used to synchronize list operation
 
 private:
+   // 禁用拷贝构造和赋值运算符
    CSndLossList(const CSndLossList&);
    CSndLossList& operator=(const CSndLossList&);
 };

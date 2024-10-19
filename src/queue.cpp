@@ -282,6 +282,8 @@ void CSndUList::insert(int64_t ts, const CUDT* u)
    insert_(ts, u);
 }
 
+
+// 如果一个UDT实例的待发送数据需要重新调度，则将其调整到小根堆的堆顶，以便尽快处理
 void CSndUList::update(const CUDT* u, bool reschedule)
 {
    // lock_guard
@@ -310,7 +312,8 @@ void CSndUList::update(const CUDT* u, bool reschedule)
    }
 
    // 更新时间戳后，重新将UDT实例放入堆中
-   // Q:这里将时间戳设置为1是什么意思？？？
+   // 将时间戳设置为1意味着该节点需要立即被重新调度
+   // 因为在堆中所有其他节点的时间戳都会大于 1，这样可以确保该节点被放置在堆顶位置，以便尽快处理
    insert_(1, u);
 }
 
@@ -327,7 +330,7 @@ int CSndUList::pop(sockaddr*& addr, CPacket& pkt)
    // 获取当前时间戳
    uint64_t ts;
    CTimer::rdtsc(ts);
-   // 如果当前时间戳比发送数据的时间戳小，直接返回
+   // 如果当前时间戳比发送数据的时间戳小，说明稍微到待发送数据规划的调度时间，直接返回
    if (ts < m_pHeap[0]->m_llTimeStamp)
       return -1;
 
@@ -336,12 +339,12 @@ int CSndUList::pop(sockaddr*& addr, CPacket& pkt)
    // 删除堆顶元素
    remove_(u);
 
-   // 如果链接异常，直接返回
+   // 如果连接异常，说明无法发送数据，直接返回
    if (!u->m_bConnected || u->m_bBroken)
       return -1;
 
    // pack a packet from the socket
-   // 数据打包
+   // 数据打包，并计算下一次调度的时间
    if (u->packData(pkt, ts) <= 0)
       return -1;
 
@@ -349,7 +352,7 @@ int CSndUList::pop(sockaddr*& addr, CPacket& pkt)
    addr = u->m_pPeerAddr;
 
    // insert a new entry, ts is the next processing time
-   // Q:这个逻辑有什么用？
+   // 如果计算得到的 ts 大于 0，表示还有剩余时间，根据下一次调度时间，重新将数据放入堆中
    if (ts > 0)
       insert_(ts, u);
 
@@ -392,7 +395,7 @@ void CSndUList::insert_(int64_t ts, const CUDT* u)
    m_pHeap[m_iLastEntry] = n;
    n->m_llTimeStamp = ts;
 
-   // 小根堆调整，按时间戳调整
+   // 小根堆调整，按时间戳调整,堆顶节点一定是时间戳最小的节点
    int q = m_iLastEntry;
    int p = q;
    while (p != 0)

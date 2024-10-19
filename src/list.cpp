@@ -55,6 +55,7 @@ m_ListLock()
    m_piNext = new int [m_iSize];
 
    // -1 means there is no data in the node
+   // 初始化数组，-1表示没有数据
    for (int i = 0; i < size; ++ i)
    {
       m_piData1[i] = -1;
@@ -84,8 +85,10 @@ CSndLossList::~CSndLossList()
 
 int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
 {
+   // lock_guard
    CGuard listguard(m_ListLock);
 
+   // 向一个空的list中插入数据
    if (0 == m_iLength)
    {
       // insert data into an empty list

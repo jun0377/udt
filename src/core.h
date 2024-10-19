@@ -352,7 +352,7 @@ private: // Status
 private: // Sending related data
    // 发送缓冲区
    CSndBuffer* m_pSndBuffer;                    // Sender buffer
-   // 
+   // 继续丢的包，用于重传
    CSndLossList* m_pSndLossList;                // Sender loss list
    CPktTimeWindow* m_pSndTimeWindow;            // Packet sending time window
 

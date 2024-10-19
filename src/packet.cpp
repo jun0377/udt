@@ -160,10 +160,14 @@ m_iID((int32_t&)(m_nHeader[3])),
 m_pcData((char*&)(m_PacketVector[1].iov_base)),
 __pad()
 {
+   // 清空包头信息
    for (int i = 0; i < 4; ++ i)
       m_nHeader[i] = 0;
+      
+   // 包头信息
    m_PacketVector[0].iov_base = (char *)m_nHeader;
    m_PacketVector[0].iov_len = CPacket::m_iPktHdrSize;
+   // 负载信息
    m_PacketVector[1].iov_base = NULL;
    m_PacketVector[1].iov_len = 0;
 }
@@ -184,14 +188,18 @@ void CPacket::setLength(int len)
 
 void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 {
+   // 报文类型
    // Set (bit-0 = 1) and (bit-1~15 = type)
    m_nHeader[0] = 0x80000000 | (pkttype << 16);
 
    // Set additional information and control information field
+   // 根据不同的报文类型，进行相应的处理
    switch (pkttype)
    {
+   // 2 == OO10, ACK包
    case 2: //0010 - Acknowledgement (ACK)
       // ACK packet seq. no.
+      // ACK报文的序列号
       if (NULL != lparam)
          m_nHeader[1] = *(int32_t *)lparam;
 
@@ -202,8 +210,10 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 
       break;
 
+   // 6 == 0110, ACK-2包
    case 6: //0110 - Acknowledgement of Acknowledgement (ACK-2)
       // ACK packet seq. no.
+      // ACK-2报文序列号
       m_nHeader[1] = *(int32_t *)lparam;
 
       // control info field should be none
@@ -213,6 +223,7 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 
       break;
 
+   // 3 == 0011, NAK包，次报文说明发生了丢包
    case 3: //0011 - Loss Report (NAK)
       // loss list
       m_PacketVector[1].iov_base = (char *)rparam;
@@ -220,6 +231,7 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 
       break;
 
+   // 4 == 0100, 拥塞包,此报文说明发生了拥塞
    case 4: //0100 - Congestion Warning
       // control info field should be none
       // but "writev" does not allow this
@@ -228,6 +240,7 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
   
       break;
 
+   // 1 == 0001, 保活报文
    case 1: //0001 - Keep-alive
       // control info field should be none
       // but "writev" does not allow this
@@ -235,14 +248,16 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
       m_PacketVector[1].iov_len = 4; //0;
 
       break;
-
+   
+   // 0 == 0000，握手报文
    case 0: //0000 - Handshake
       // control info filed is handshake info
       m_PacketVector[1].iov_base = (char *)rparam;
       m_PacketVector[1].iov_len = size; //sizeof(CHandShake);
 
       break;
-
+   
+   // 5 == 0101，关闭连接报文
    case 5: //0101 - Shutdown
       // control info field should be none
       // but "writev" does not allow this
@@ -251,6 +266,7 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 
       break;
 
+   // 7 == 0111，丢包请求报文
    case 7: //0111 - Message Drop Request
       // msg id 
       m_nHeader[1] = *(int32_t *)lparam;
@@ -260,7 +276,8 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
       m_PacketVector[1].iov_len = size;
 
       break;
-
+   
+   // 8 == 1000，收到对端的错误信号
    case 8: //1000 - Error Signal from the Peer Side
       // Error type
       m_nHeader[1] = *(int32_t *)lparam;
@@ -272,6 +289,7 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 
       break;
 
+   // 32767 == 0x7FFF，保留报文
    case 32767: //0x7FFF - Reserved for user defined control packets
       // for extended control packet
       // "lparam" contains the extended type information for bit 16 - 31

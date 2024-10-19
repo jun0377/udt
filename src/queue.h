@@ -156,6 +156,8 @@ struct CSNode
    int m_iHeapLoc;		// location on the heap, -1 means not on the heap
 };
 
+// 使用一个小根堆来存储待发送的数据，堆中的节点安装时间戳进行排序，堆顶节点一定是时间戳最小的节点
+// 小根堆的大小可以动态增大，调整方式是成倍增加
 class CSndUList
 {
 friend class CSndQueue;
@@ -239,6 +241,7 @@ private:
 
    pthread_cond_t* m_pWindowCond;
 
+   // 定时器的初始化由class CSndQueue来完成
    CTimer* m_pTimer;
 
 private:

@@ -61,12 +61,18 @@ friend class CSndQueue;
 friend class CRcvQueue;
 
 public:
+   // 序列号,即m_nHeader[0]
    int32_t& m_iSeqNo;                   // alias: sequence number
+   // ,即m_nHeader[1]
    int32_t& m_iMsgNo;                   // alias: message number
+   // 时间戳，即m_nHeader[2]
    int32_t& m_iTimeStamp;               // alias: timestamp
+   // socket ID，即m_nHeader[3]
    int32_t& m_iID;			// alias: socket ID
+   // 负载数据，即m_PacketVector[1]中的数据
    char*& m_pcData;                     // alias: data/control information
 
+   // 包头大小
    static const int m_iPktHdrSize;	// packet header size
 
 public:
@@ -80,6 +86,7 @@ public:
       // Returned value:
       //    the payload or the control information field length.
 
+   // 获取负载数据的大小，不包含包头长度
    int getLength() const;
 
       // Functionality:
@@ -89,6 +96,7 @@ public:
       // Returned value:
       //    None.
 
+   // 设置负载数据的大小，不包含包头长度
    void setLength(int len);
 
       // Functionality:
@@ -100,7 +108,8 @@ public:
       //    3) [in] size: size of rparam, in number of bytes;
       // Returned value:
       //    None.
-
+   
+   // 报文打包，根据不同类型的报文执行不同的操作
    void pack(int pkttype, void* lparam = NULL, void* rparam = NULL, int size = 0);
 
       // Functionality:
@@ -110,6 +119,7 @@ public:
       // Returned value:
       //    Pointer to the packet vector.
 
+   // 获取完整报文，包括包头和payload
    iovec* getPacketVector();
 
       // Functionality:
@@ -119,6 +129,7 @@ public:
       // Returned value:
       //    packet flag (0 or 1).
 
+   // 获取报文中的flag,m_nHeader[0]的bit[0]
    int getFlag() const;
 
       // Functionality:
@@ -128,6 +139,7 @@ public:
       // Returned value:
       //    packet type filed (000 ~ 111).
 
+   // 获取报文类型，ACK/ACK-2/NAK/各类控制报文
    int getType() const;
 
       // Functionality:
@@ -137,6 +149,7 @@ public:
       // Returned value:
       //    extended packet type filed (0x000 ~ 0xFFF).
 
+   // 获取报文扩展类型，m_nHeader[0]的低16位
    int getExtendedType() const;
 
       // Functionality:
@@ -146,6 +159,7 @@ public:
       // Returned value:
       //    packet header field (bit 16~31).
 
+   // 获取ACK-2报文的序列号，m_nHeader[1]
    int32_t getAckSeqNo() const;
 
       // Functionality:
@@ -155,6 +169,7 @@ public:
       // Returned value:
       //    packet header field [1] (bit 0~1).
 
+   // 获取消息边界标志位，m_nHeader[1]的bit[0:1]
    int getMsgBoundary() const;
 
       // Functionality:
@@ -164,6 +179,7 @@ public:
       // Returned value:
       //    packet header field [1] (bit 2).
 
+   // 获取消息顺序标志位，m_nHeader[1]的bit[2]
    bool getMsgOrderFlag() const;
 
       // Functionality:
@@ -173,6 +189,7 @@ public:
       // Returned value:
       //    packet header field [1] (bit 3~31).
 
+   // 获取消息序列号，m_nHeader[1]的bit[3:31]
    int32_t getMsgSeq() const;
 
       // Functionality:
@@ -182,15 +199,19 @@ public:
       // Returned value:
       //    Pointer to the new packet.
 
+   // 复制报文
    CPacket* clone() const;
 
 protected:
+   // 128bit的自定义包头
    uint32_t m_nHeader[4];               // The 128-bit header field
+   // m_PacketVector[0]存储包头信息；m_PacketVector[1]存储负载信息
    iovec m_PacketVector[2];             // The 2-demension vector of UDT packet [header, data]
 
    int32_t __pad;
 
 protected:
+   // 仅声明未实现，表示不支持赋值操作
    CPacket& operator=(const CPacket&);
 };
 
