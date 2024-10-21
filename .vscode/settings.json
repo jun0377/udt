@@ -54,7 +54,11 @@
         "iterator": "cpp",
         "memory_resource": "cpp",
         "optional": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "bit": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "random": "cpp"
     },
     "C_Cpp.dimInactiveRegions": false
 }

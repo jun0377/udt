@@ -60,6 +60,7 @@ struct CEPollDesc
 
    // 系统epoll实例
    int m_iLocalID;                           // local system epoll ID
+   // 系统套接字，不是UDT套接字
    std::set<SYSSOCKET> m_sLocals;            // set of local (non-UDT) descriptors
 
    // 可写的sockfd
@@ -88,7 +89,7 @@ public: // for CUDTUnited API
       // Returned value:
       //    new EPoll ID if success, otherwise an error number.
 
-   // 创建一个epoll实例
+   // 创建一个UDT epoll实例
    int create();
 
       // Functionality:
@@ -100,7 +101,7 @@ public: // for CUDTUnited API
       // Returned value:
       //    0 if success, otherwise an error number.
 
-   // 向epoll实例中添加udt sockfd
+   // 向UDT epoll实例中添加udt sockfd；根据所关注的不同事件，插入到相应的队列中
    int add_usock(const int eid, const UDTSOCKET& u, const int* events = NULL);
 
       // Functionality:
@@ -178,10 +179,11 @@ public: // for CUDT to acknowledge IO status
    int update_events(const UDTSOCKET& uid, std::set<int>& eids, int events, bool enable);
 
 private:
+   // epoll实例的表示
    int m_iIDSeed;                            // seed to generate a new ID
    pthread_mutex_t m_SeedLock;
 
-   // 所有的epoll实例
+   // 使用一个map来保存所有的UDT epoll实例
    std::map<int, CEPollDesc> m_mPolls;       // all epolls
    pthread_mutex_t m_EPollLock;
 };

@@ -564,7 +564,7 @@ void CUDT::open()
    m_bOpened = true;
 }
 
-// 只是设置了listener，并没有真的执行listen操作
+// 只是设置了一个标志位，表明处于listen模式
 void CUDT::listen()
 {
    std::cout << "CUDT::listen..." << std::endl;

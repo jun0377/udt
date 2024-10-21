@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
 
    cout << "[main] server is ready at port: " << service << endl;
 
-   // listen,UDP是不需要listen的，这里只是设置了一个listener
+   // listen
    if (UDT::ERROR == UDT::listen(serv, 10))
    {
       cout << "[main] listen: " << UDT::getlasterror().getErrorMessage() << endl;

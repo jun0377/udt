@@ -56,22 +56,26 @@ using namespace std;
 CEPoll::CEPoll():
 m_iIDSeed(0)
 {
+   // 初始化互斥锁
    CGuard::createMutex(m_EPollLock);
 }
 
 CEPoll::~CEPoll()
 {
+   // 释放互斥锁
    CGuard::releaseMutex(m_EPollLock);
 }
 
 int CEPoll::create()
 {
+   // lock_guard
    CGuard pg(m_EPollLock);
 
    int localid = 0;
 
    #ifdef LINUX
-   // epoll_create的参数实际上并没有作用
+  
+   // 调用系统API创建一个epoll实例
    localid = epoll_create(1024);
    if (localid < 0)
       throw CUDTException(-1, 0, errno);
@@ -84,8 +88,11 @@ int CEPoll::create()
    if (++ m_iIDSeed >= 0x7FFFFFFF)
       m_iIDSeed = 0;
 
+   // 描述一个epoll实例
    CEPollDesc desc;
+   // 唯一标识
    desc.m_iID = m_iIDSeed;
+   // 初始化本地实例为0
    desc.m_iLocalID = localid;
    m_mPolls[desc.m_iID] = desc;
 
@@ -94,15 +101,18 @@ int CEPoll::create()
 
 int CEPoll::add_usock(const int eid, const UDTSOCKET& u, const int* events)
 {
+   // lock_guard
    CGuard pg(m_EPollLock);
 
+   // 查找epoll实例，不存在则抛出异常
    map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
    if (p == m_mPolls.end())
       throw CUDTException(5, 13);
 
-   // 将sockfd放入对应的集合中
+   // 插入到等待可读事件的队列中
    if (!events || (*events & UDT_EPOLL_IN))
       p->second.m_sUDTSocksIn.insert(u);
+   // 插入到等待可写时间的队列中
    if (!events || (*events & UDT_EPOLL_OUT))
       p->second.m_sUDTSocksOut.insert(u);
 

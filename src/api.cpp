@@ -559,10 +559,12 @@ int CUDTUnited::bind(const UDTSOCKET u, const sockaddr* name, int namelen)
 
 int CUDTUnited::bind(UDTSOCKET u, UDPSOCKET udpsock)
 {
+   // 从Map中查找获取UDT套接字
    CUDTSocket* s = locate(u);
    if (NULL == s)
       throw CUDTException(5, 4, 0);
 
+   // lock_guard
    CGuard cg(s->m_ControlLock);
 
    // cannot bind a socket more than once
@@ -574,22 +576,29 @@ int CUDTUnited::bind(UDTSOCKET u, UDPSOCKET udpsock)
    sockaddr* name;
    socklen_t namelen;
 
+   // IPv4 or IPv6
    if (AF_INET == s->m_iIPversion)
    {
+      // IPv4
       namelen = sizeof(sockaddr_in);
       name = (sockaddr*)&name4;
    }
    else
    {
+      // IPv6
       namelen = sizeof(sockaddr_in6);
       name = (sockaddr*)&name6;
    }
 
+   // 调用系统API获取本地地址信息
    if (-1 == ::getsockname(udpsock, name, &namelen))
       throw CUDTException(5, 3);
 
+   // open一个UDT实例
    s->m_pUDT->open();
+   // 使用一个已创建的UDP套接字udpsock
    updateMux(s, name, &udpsock);
+   // 更新状态为OPENED
    s->m_Status = OPENED;
 
    // copy address information of local node
@@ -598,6 +607,7 @@ int CUDTUnited::bind(UDTSOCKET u, UDPSOCKET udpsock)
    return 0;
 }
 
+// 创建了两个队列：待处理的连接队列和已连接队列
 int CUDTUnited::listen(const UDTSOCKET u, int backlog)
 {
    std::cout << "CUDTUnited::listen..." << std::endl;
@@ -645,8 +655,10 @@ int CUDTUnited::listen(const UDTSOCKET u, int backlog)
       throw CUDTException(3, 2, 0);
    }
 
+   // 设置一个标志位，表示处于listem模式
    s->m_pUDT->listen();
 
+   // 进入下一状态LISTENING
    s->m_Status = LISTENING;
 
    return 0;
@@ -673,16 +685,20 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
    if (ls->m_pUDT->m_bRendezvous)
       throw CUDTException(5, 7, 0);
 
+   // 套接字初始化
    UDTSOCKET u = CUDT::INVALID_SOCK;
    bool accepted = false;
 
    // !!only one conection can be set up each time!!
    // 每次只能建立一个连接
    #ifndef WIN32
+      // 阻塞，直到获得一个连接请求
       while (!accepted)
       {
+         // 确保一次只处理一个连接请求
          pthread_mutex_lock(&(ls->m_AcceptLock));
 
+         // 套接字不可用时，将accepted设置为true,通过这种方式退出循环
          if ((LISTENING != ls->m_Status) || ls->m_pUDT->m_bBroken)
          {
             // This socket has been closed.
@@ -692,9 +708,14 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
          else if (ls->m_pQueuedSockets->size() > 0)
          {
             // 将sockfd从m_pQueuedSockets转移到m_pAcceptSockets
+            
+            // 获取待连接队列中的第一个元素
             u = *(ls->m_pQueuedSockets->begin());
+            // 将sockfd添加到已连接队列的队尾
             ls->m_pAcceptSockets->insert(ls->m_pAcceptSockets->end(), u);
+            // 从待连接队列中删除该元素
             ls->m_pQueuedSockets->erase(ls->m_pQueuedSockets->begin());
+            // 更新标志位
             accepted = true;
          }
          // 同步接收模式　？？？
@@ -703,11 +724,9 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
             accepted = true;
          }
 
-         // 没有待处理的连接时，通过条件变量休眠
+         // 没有待处理连接时，通过条件变量休眠
          if (!accepted && (LISTENING == ls->m_Status)){
-            std::cout << __func__ << ":" << __LINE__ << " wait for cond" << std::endl;
             pthread_cond_wait(&(ls->m_AcceptCond), &(ls->m_AcceptLock));
-            std::cout << __func__ << ":" << __LINE__ << " be awaked" << std::endl;
          }
 
          // 这一步做了什么操作 ???
