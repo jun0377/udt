@@ -45,7 +45,7 @@ written by
 #include "udt.h"
 #include "packet.h"
 
-
+// 调用系统API socket/bind/sendmsg/recvmsg来实现UDP通信
 class CChannel
 {
 public:
@@ -60,7 +60,7 @@ public:
       // Returned value:
       //    None.
 
-   // 在指定地址上open一个UDP连接, socket/bind
+   // 调用系统API socket/bind
    void open(const sockaddr* addr = NULL);
 
       // Functionality:
@@ -70,7 +70,7 @@ public:
       // Returned value:
       //    None.
 
-   // 在指定端口上open一个UDP连接, socket/bind
+   // 使用已创建的sockfd
    void open(UDPSOCKET udpsock);
 
       // Functionality:
@@ -80,6 +80,7 @@ public:
       // Returned value:
       //    None.
 
+   // 调用系统API close
    void close() const;
 
       // Functionality:
@@ -89,7 +90,7 @@ public:
       // Returned value:
       //    Current UDP sending buffer size.
 
-   // 获取发送缓冲区大小
+   // 调用系统API getsockopt，获取发送缓冲区大小
    int getSndBufSize();
 
       // Functionality:
@@ -99,7 +100,7 @@ public:
       // Returned value:
       //    Current UDP receiving buffer size.
 
-   // 获取接收缓冲区大小
+   //  调用系统API getsockopt，获取接收缓冲区大小
    int getRcvBufSize();
 
       // Functionality:
@@ -129,7 +130,7 @@ public:
       // Returned value:
       //    None.
 
-   // 获取本地地址
+   // 调用系统API getsockname, 获取当前sockfd的本地地址信息
    void getSockAddr(sockaddr* addr) const;
 
       // Functionality:
@@ -139,9 +140,8 @@ public:
       // Returned value:
       //    None.
 
-   // 获取对端地址
+   // 调用系统API getpeername,获取对端地址
    void getPeerAddr(sockaddr* addr) const;
-
       // Functionality:
       //    Send a packet to the given address.
       // Parameters:
@@ -150,7 +150,7 @@ public:
       // Returned value:
       //    Actual size of data sent.
 
-   // 发送一个packet
+   // 调用系统API sendmsg, 发送一个packet
    int sendto(const sockaddr* addr, CPacket& packet) const;
 
       // Functionality:
@@ -161,22 +161,25 @@ public:
       // Returned value:
       //    Actual size of data received.
 
-   // 接收一个packet
+   // 调用系统API recvmsg, 接收数据
    int recvfrom(sockaddr* addr, CPacket& packet) const;
 
 private:
-   // 设置套接字属性
+   // 设置套接字属性：发送/接收缓冲区大小 及 接收超时时间
    void setUDPSockOpt();
 
 private:
    // IPv4 or IPv6
    int m_iIPversion;                    // IP version
+   // 地址长度，IPv6/IPv6的地址长度不同
    int m_iSockAddrSize;                 // socket address structure size (pre-defined to avoid run-time test)
 
    // UDP系统套接字
    UDPSOCKET m_iSocket;                 // socket descriptor
 
+   // 发送缓冲区大小，默认为65536
    int m_iSndBufSize;                   // UDP sending buffer size
+   // 接收缓冲区大小，默认为65536
    int m_iRcvBufSize;                   // UDP receiving buffer size
 };
 

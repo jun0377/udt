@@ -244,15 +244,19 @@ private:
 // decseq: decrease the seq# by 1
 // incseq: increase the seq# by a given offset
 
+// UDT包的序列号
 class CSeqNo
 {
 public:
+   // 比较两个序列号的大小
    inline static int seqcmp(int32_t seq1, int32_t seq2)
    {return (abs(seq1 - seq2) < m_iSeqNoTH) ? (seq1 - seq2) : (seq2 - seq1);}
 
+   // 从第一个到第二个序列号的长度
    inline static int seqlen(int32_t seq1, int32_t seq2)
    {return (seq1 <= seq2) ? (seq2 - seq1 + 1) : (seq2 - seq1 + m_iMaxSeqNo + 2);}
 
+   // 从第二个序列到第一个序列的偏移量
    inline static int seqoff(int32_t seq1, int32_t seq2)
    {
       if (abs(seq1 - seq2) < m_iSeqNoTH)
@@ -264,17 +268,22 @@ public:
       return seq2 - seq1 + m_iMaxSeqNo + 1;
    }
 
+   // 序列号加一，当序列号大于m_iMaxSeqNo，则回卷到 0
    inline static int32_t incseq(int32_t seq)
    {return (seq == m_iMaxSeqNo) ? 0 : seq + 1;}
 
+   // 序列号减一，当序列号小于0，则回卷到 m_iMaxSeqNo
    inline static int32_t decseq(int32_t seq)
    {return (seq == 0) ? m_iMaxSeqNo : seq - 1;}
 
+   // 序列号加一个偏移量，当序列号加上偏移量大于m_iMaxSeqNo，则回卷到 0
    inline static int32_t incseq(int32_t seq, int32_t inc)
    {return (m_iMaxSeqNo - seq >= inc) ? seq + inc : seq - m_iMaxSeqNo + inc - 1;}
 
 public:
+   // 比较序列号时使用的阈值，是序列号最大值的一半；当两个序列号的差值超过这个值时，说明已经超出了最大序列号范围，计算时需要加上m_iMaxSeqNo
    static const int32_t m_iSeqNoTH;             // threshold for comparing seq. no.
+   // 序列号最大值
    static const int32_t m_iMaxSeqNo;            // maximum sequence number used in UDT
 };
 

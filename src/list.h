@@ -47,6 +47,7 @@ written by
 
 
 // 传输中丢的包，用于重传
+// 使用两个list来保存丢包的起始序列号和终止序列号
 class CSndLossList
 {
 public:
@@ -61,7 +62,7 @@ public:
       // Returned value:
       //    number of packets that are not in the list previously.
 
-   // 向发送丢包list中插入序列号
+   // 插入一对序列号，表示丢包范围
    int insert(int32_t seqno1, int32_t seqno2);
 
       // Functionality:
@@ -70,7 +71,8 @@ public:
       //    0) [in] seqno: sequence number.
       // Returned value:
       //    None.
-
+   
+   // 删除所有小于seqno的序列号
    void remove(int32_t seqno);
 
       // Functionality:
@@ -80,6 +82,7 @@ public:
       // Returned value:
       //    The length of the list.
 
+   // 获取丢包数量，按序列号进行统计
    int getLossLength();
 
       // Functionality:
@@ -88,7 +91,8 @@ public:
       //    None.
       // Returned value:
       //    The seq. no. or -1 if the list is empty.
-
+   
+   // 获取最小序列号，并删除该序列号
    int32_t getLostSeq();
 
 private:
@@ -101,10 +105,11 @@ private:
 
    // list中的第一个节点
    int m_iHead;                         // first node
-   // 
+   // 丢了多少个包，按序列号进行统计
    int m_iLength;                       // loss length
    // 静态数组的大小
    int m_iSize;                         // size of the static array
+   // 最新一次插入的位置
    int m_iLastInsertPos;                // position of last insert node
 
    pthread_mutex_t m_ListLock;          // used to synchronize list operation

@@ -73,18 +73,20 @@ int main(int argc, char* argv[])
       cout << "[main] bind: " << UDT::getlasterror().getErrorMessage() << endl;
       return 0;
    }
-
+   
+   // 和getaddrinfo搭配使用，释放内存，否则会造成内存泄露
    freeaddrinfo(res);
 
    cout << "[main] server is ready at port: " << service << endl;
 
-   // listen,并没有执行什么特殊操作，只是设置了一下listener
+   // listen,UDP是不需要listen的，这里只是设置了一个listener
    if (UDT::ERROR == UDT::listen(serv, 10))
    {
       cout << "[main] listen: " << UDT::getlasterror().getErrorMessage() << endl;
       return 0;
    }
 
+   // client地址
    sockaddr_storage clientaddr;
    int addrlen = sizeof(clientaddr);
 

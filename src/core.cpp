@@ -68,7 +68,9 @@ const int CUDT::ERROR = -1;
 const UDTSOCKET UDT::INVALID_SOCK = CUDT::INVALID_SOCK;
 const int UDT::ERROR = CUDT::ERROR;
 
+// 序列号门限值，是序列号最大值的一半
 const int32_t CSeqNo::m_iSeqNoTH = 0x3FFFFFFF;
+// 序列号最大值，超过此值将重新从0开始
 const int32_t CSeqNo::m_iMaxSeqNo = 0x7FFFFFFF;
 const int32_t CAckNo::m_iMaxAckSeqNo = 0x7FFFFFFF;
 const int32_t CMsgNo::m_iMsgNoTH = 0xFFFFFFF;
@@ -567,6 +569,7 @@ void CUDT::listen()
 {
    std::cout << "CUDT::listen..." << std::endl;
 
+   // lock_guard
    CGuard cg(m_ConnectionLock);
 
    if (!m_bOpened)

@@ -126,7 +126,9 @@ enum EPOLLOpt
 };
 
 enum UDTSTATUS {
-   INIT = 1, 
+   // 初始状态
+   INIT = 1,
+   // UDP套接字已建立
    OPENED, 
    LISTENING, 
    CONNECTING, 

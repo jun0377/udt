@@ -545,12 +545,13 @@ int CUDTUnited::bind(const UDTSOCKET u, const sockaddr* name, int namelen)
 
    // 开启一个UDT连接
    s->m_pUDT->open();
-   // 更新多路复用器，这是个什么玩意儿？
+   // 更新UDP连接复用器，使用一个已建立的UDP连接或创建一个新的UDP连接
    updateMux(s, name);
    // 状态机：INIT -> OPENED
    s->m_Status = OPENED;
 
    // copy address information of local node
+   // 保存本地地址
    s->m_pUDT->m_pSndQueue->m_pChannel->getSockAddr(s->m_pSelfAddr);
 
    return 0;
@@ -605,7 +606,8 @@ int CUDTUnited::listen(const UDTSOCKET u, int backlog)
    CUDTSocket* s = locate(u);
    if (NULL == s)
       throw CUDTException(5, 4, 0);
-
+   
+   // lock_guard
    CGuard cg(s->m_ControlLock);
 
    // do nothing if the socket is already listening
@@ -626,6 +628,7 @@ int CUDTUnited::listen(const UDTSOCKET u, int backlog)
    if (backlog <= 0)
       throw CUDTException(5, 3, 0);
 
+   // 套接字上可以排队的最大连接请求数量
    s->m_uiBackLog = backlog;
 
    try
@@ -654,7 +657,7 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
    if ((NULL != addr) && (NULL == addrlen))
       throw CUDTException(5, 3, 0);
 
-   // 根据socket id查找CUDTSocket实例
+   // 根据socket id查找CUDTSocket实例，ls == local socket
    CUDTSocket* ls = locate(listen);
 
    if (ls == NULL)
@@ -674,6 +677,7 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
    bool accepted = false;
 
    // !!only one conection can be set up each time!!
+   // 每次只能建立一个连接
    #ifndef WIN32
       while (!accepted)
       {
@@ -1433,11 +1437,14 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
    std::cout << "CUDTUnited::updateMux()..." << std::endl;
    CGuard cg(m_ControlLock);
 
+   // 地址复用
    if ((s->m_pUDT->m_bReuseAddr) && (NULL != addr))
    {
+      // 从IPv4/IPv6地址中获取端口号
       int port = (AF_INET == s->m_pUDT->m_iIPversion) ? ntohs(((sockaddr_in*)addr)->sin_port) : ntohs(((sockaddr_in6*)addr)->sin6_port);
 
       // find a reusable address
+      // 找到一个可复用的地址，即使用一个已建立的连接
       for (map<int, CMultiplexer>::iterator i = m_mMultiplexer.begin(); i != m_mMultiplexer.end(); ++ i)
       {
          if ((i->second.m_iIPversion == s->m_pUDT->m_iIPversion) && (i->second.m_iMSS == s->m_pUDT->m_iMSS) && i->second.m_bReusable)
@@ -1456,6 +1463,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
    }
 
    // a new multiplexer is needed
+   // 创建一个新的multiplexer
    CMultiplexer m;
    m.m_iMSS = s->m_pUDT->m_iMSS;
    m.m_iIPversion = s->m_pUDT->m_iIPversion;
@@ -1470,6 +1478,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
    // 到这一步才真正调用系统socket创建了一个套接字,并进行bind
    try
    {
+      // 调用系统API socket/bind
       if (NULL != udpsock)
          m.m_pChannel->open(*udpsock);
       else
@@ -1477,25 +1486,31 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
    }
    catch (CUDTException& e)
    {
+      // 调用系统API close
       m.m_pChannel->close();
       delete m.m_pChannel;
       throw e;
    }
 
+   // 更新CMultiplexer相关信息
    sockaddr* sa = (AF_INET == s->m_pUDT->m_iIPversion) ? (sockaddr*) new sockaddr_in : (sockaddr*) new sockaddr_in6;
    m.m_pChannel->getSockAddr(sa);
    m.m_iPort = (AF_INET == s->m_pUDT->m_iIPversion) ? ntohs(((sockaddr_in*)sa)->sin_port) : ntohs(((sockaddr_in6*)sa)->sin6_port);
    if (AF_INET == s->m_pUDT->m_iIPversion) delete (sockaddr_in*)sa; else delete (sockaddr_in6*)sa;
 
+   // 创建一个定时器
    m.m_pTimer = new CTimer;
 
+   // 创建发送/接收队列
    m.m_pSndQueue = new CSndQueue;
    m.m_pSndQueue->init(m.m_pChannel, m.m_pTimer);
    m.m_pRcvQueue = new CRcvQueue;
    m.m_pRcvQueue->init(32, s->m_pUDT->m_iPayloadSize, m.m_iIPversion, 1024, m.m_pChannel, m.m_pTimer);
 
+   // 保存CMultiplexer到map中
    m_mMultiplexer[m.m_iID] = m;
 
+   // 更新UDT套接字发送/接收队列
    s->m_pUDT->m_pSndQueue = m.m_pSndQueue;
    s->m_pUDT->m_pRcvQueue = m.m_pRcvQueue;
    s->m_iMuxID = m.m_iID;

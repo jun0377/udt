@@ -93,9 +93,10 @@ public:
 
    // accept阶段使用的条件变量和锁
    pthread_cond_t m_AcceptCond;              // used to block "accept" call
+   // 建立UDT连接过程中使用的锁，确保每次只能建立一个连接
    pthread_mutex_t m_AcceptLock;             // mutex associated to m_AcceptCond
 
-   // 待处理连接队列的大小，listen函数的第二个参数
+   // 套接字上可以排队的最大连接请求数量，listen函数的第二个参数
    unsigned int m_uiBackLog;                 // maximum number of connections in queue
 
    int m_iMuxID;                             // multiplexer ID
@@ -256,10 +257,12 @@ private:
    // 根据socket id从m_Sockets中查找对应的CUDTSocket实例
    CUDTSocket* locate(const UDTSOCKET u);
    CUDTSocket* locate(const sockaddr* peer, const UDTSOCKET id, int32_t isn);
+   // 更新CMultiplexer，每一个CMultiplexer都是一个已建立的UDP连接
    void updateMux(CUDTSocket* s, const sockaddr* addr = NULL, const UDPSOCKET* = NULL);
    void updateMux(CUDTSocket* s, const CUDTSocket* ls);
 
 private:
+   // 多路复用器map
    std::map<int, CMultiplexer> m_mMultiplexer;		// UDP multiplexer
    pthread_mutex_t m_MultiplexerLock;
 

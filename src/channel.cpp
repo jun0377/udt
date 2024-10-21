@@ -93,6 +93,7 @@ CChannel::~CChannel()
 void CChannel::open(const sockaddr* addr)
 {
    // construct an socket
+   // 调用系统API socket创建一个套接字
    m_iSocket = ::socket(m_iIPversion, SOCK_DGRAM, 0);
 
    #ifdef WIN32
@@ -102,10 +103,13 @@ void CChannel::open(const sockaddr* addr)
    #endif
       throw CUDTException(1, 0, NET_ERROR);
 
+   // 调用系统API bind绑定套接字
    if (NULL != addr)
    {
+      // 获取地址长度，IPv6/IPv6的地址长度不同
       socklen_t namelen = m_iSockAddrSize;
 
+      // 调用系统API bind到指定的地址上
       if (0 != ::bind(m_iSocket, addr, namelen))
          throw CUDTException(1, 3, NET_ERROR);
    }
@@ -121,6 +125,7 @@ void CChannel::open(const sockaddr* addr)
       hints.ai_family = m_iIPversion;
       hints.ai_socktype = SOCK_DGRAM;
 
+      // 自动选择一个未使用的端口进行绑定
       if (0 != ::getaddrinfo(NULL, "0", &hints, &res))
          throw CUDTException(1, 3, NET_ERROR);
 
@@ -130,6 +135,7 @@ void CChannel::open(const sockaddr* addr)
       ::freeaddrinfo(res);
    }
 
+   // 设置套接字参数：发送/接收缓冲区大小 及 接收超时时间
    setUDPSockOpt();
 }
 
@@ -141,6 +147,7 @@ void CChannel::open(UDPSOCKET udpsock)
 
 void CChannel::setUDPSockOpt()
 {
+   // 设置发送/接收缓冲区大小
    #if defined(BSD) || defined(OSX)
       // BSD system will fail setsockopt if the requested buffer size exceeds system maximum value
       int maxsize = 64000;
@@ -165,9 +172,11 @@ void CChannel::setUDPSockOpt()
       tv.tv_usec = 100;
    #endif
 
+   // 设置接收超时时间
    #ifdef UNIX
       // Set non-blocking I/O
       // UNIX does not support SO_RCVTIMEO
+      // 设置为非阻塞模式
       int opts = ::fcntl(m_iSocket, F_GETFL);
       if (-1 == ::fcntl(m_iSocket, F_SETFL, opts | O_NONBLOCK))
          throw CUDTException(1, 3, NET_ERROR);
@@ -231,6 +240,7 @@ void CChannel::getPeerAddr(sockaddr* addr) const
 int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
 {
    // convert control information into network order
+   // 将包头的控制信息转换成网络字节序
    if (packet.getFlag())
       for (int i = 0, n = packet.getLength() / 4; i < n; ++ i)
          *((uint32_t *)packet.m_pcData + i) = htonl(*((uint32_t *)packet.m_pcData + i));
@@ -238,6 +248,7 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
    // convert packet header into network order
    //for (int j = 0; j < 4; ++ j)
    //   packet.m_nHeader[j] = htonl(packet.m_nHeader[j]);
+   // 将包头转换成网络字节序
    uint32_t* p = packet.m_nHeader;
    for (int j = 0; j < 4; ++ j)
    {
@@ -254,7 +265,8 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
       mh.msg_control = NULL;
       mh.msg_controllen = 0;
       mh.msg_flags = 0;
-
+   
+      // 调用系统API sendmsg, 发送一个packet
       int res = ::sendmsg(m_iSocket, &mh, 0);
    #else
       DWORD size = CPacket::m_iPktHdrSize + packet.getLength();
@@ -266,6 +278,7 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
    // convert back into local host order
    //for (int k = 0; k < 4; ++ k)
    //   packet.m_nHeader[k] = ntohl(packet.m_nHeader[k]);
+   // 重新将包头转换成本地字节序
    p = packet.m_nHeader;
    for (int k = 0; k < 4; ++ k)
    {
@@ -273,6 +286,7 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
        ++ p;
    }
 
+   // 重新将包头的flag信息转换成本地字节序
    if (packet.getFlag())
    {
       for (int l = 0, n = packet.getLength() / 4; l < n; ++ l)
@@ -303,7 +317,8 @@ int CChannel::recvfrom(sockaddr* addr, CPacket& packet) const
          tv.tv_usec = 10000;
          ::select(m_iSocket+1, &set, NULL, &set, &tv);
       #endif
-
+      
+      // 调用系统API recvmsg, 接收数据
       int res = ::recvmsg(m_iSocket, &mh, 0);
    #else
       DWORD size = CPacket::m_iPktHdrSize + packet.getLength();
@@ -325,6 +340,7 @@ int CChannel::recvfrom(sockaddr* addr, CPacket& packet) const
    // convert back into local host order
    //for (int i = 0; i < 4; ++ i)
    //   packet.m_nHeader[i] = ntohl(packet.m_nHeader[i]);
+   // 将包头转换成本地字节序
    uint32_t* p = packet.m_nHeader;
    for (int i = 0; i < 4; ++ i)
    {
@@ -332,6 +348,7 @@ int CChannel::recvfrom(sockaddr* addr, CPacket& packet) const
       ++ p;
    }
 
+   // 将包头中的flag转换成本地字节序
    if (packet.getFlag())
    {
       for (int j = 0, n = packet.getLength() / 4; j < n; ++ j)

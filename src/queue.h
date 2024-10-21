@@ -435,6 +435,7 @@ private:
    pthread_t m_WorkerThread;
 
 private:
+   // 使用一个小根堆来存储待发送的数据，堆中的节点安装时间戳进行排序
    CSndUList* m_pSndUList;		// List of UDT instances for data sending
    CChannel* m_pChannel;                // The UDP channel for data sending
    CTimer* m_pTimer;			// Timing facility
@@ -547,7 +548,8 @@ private:
    CRcvQueue& operator=(const CRcvQueue&);
 };
 
-// 多路复用器，允许在一个网络连接上同时传输多个数据流
+// CMultiplexer，UDP连接复用器，每一个CMultiplexer都是一个已建立的UDP连接
+// 描述了一个UDT套接字相关的发送/接收队列,端口号等参数
 struct CMultiplexer
 {
    // 发送队列，存储待发送的数据

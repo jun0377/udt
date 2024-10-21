@@ -88,38 +88,47 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
    // lock_guard
    CGuard listguard(m_ListLock);
 
-   // 向一个空的list中插入数据
+   // 0 == m_iLength说明此时sndLossList为空
    if (0 == m_iLength)
    {
       // insert data into an empty list
 
+      // 向一个空的list中插入数据，插入到head节点
       m_iHead = 0;
       m_piData1[m_iHead] = seqno1;
       if (seqno2 != seqno1)
          m_piData2[m_iHead] = seqno2;
 
       m_piNext[m_iHead] = -1;
+      // 最新一个node的索引
       m_iLastInsertPos = m_iHead;
 
+      // 丢了多少个包，按序列号进行统计
       m_iLength += CSeqNo::seqlen(seqno1, seqno2);
 
       return m_iLength;
    }
 
    // otherwise find the position where the data can be inserted
+   // sndLossList中已经有数据了，需要计算插入位置
    int origlen = m_iLength;
+   // 计算seqno1相较于head节点的偏移量
    int offset = CSeqNo::seqoff(m_piData1[m_iHead], seqno1);
+   // 计算插入位置
    int loc = (m_iHead + offset + m_iSize) % m_iSize;
 
+   // 插入到head节点之前
    if (offset < 0)
    {
       // Insert data prior to the head pointer
 
+      // 插入
       m_piData1[loc] = seqno1;
       if (seqno2 != seqno1)
          m_piData2[loc] = seqno2;
 
       // new node becomes head
+      // 新的节点成为head节点
       m_piNext[loc] = m_iHead;
       m_iHead = loc;
       m_iLastInsertPos = loc;
@@ -128,19 +137,25 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
    }
    else if (offset > 0)
    {
+      // 起始序列号相同
       if (seqno1 == m_piData1[loc])
       {
+         // 最新节点的插入位置
          m_iLastInsertPos = loc;
 
          // first seqno is equivlent, compare the second
+         // 起始序列号相同，比较第终止序列号；-1 == m_piData2[loc]说明终止序列号不存在
          if (-1 == m_piData2[loc])
          {
+            // 起始序列号和终止序列号不同，更新m_piData2；
+            // 起始序列号和终止序列号相同，m_piData2中保存的终止序列号设置为-1
             if (seqno2 != seqno1)
             {
                m_iLength += CSeqNo::seqlen(seqno1, seqno2) - 1;
                m_piData2[loc] = seqno2;
             }
          }
+         // 新的终止序列号大于m_piData2中已保存的终止序列号，说明丢的包更多了，更新m_piData2中保存的终止序列号
          else if (CSeqNo::seqcmp(seqno2, m_piData2[loc]) > 0)
          {
             // new seq pair is longer than old pair, e.g., insert [3, 7] to [3, 5], becomes [3, 7]
@@ -151,30 +166,36 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
             // Do nothing if it is already there
             return 0;
       }
+      // 序列号尚未保存在m_piData1和m_piData2数组中
       else
       {
          // searching the prior node
+         // 搜索优先节点，减少寻找插入位置时的遍历次数
          int i;
          if ((-1 != m_iLastInsertPos) && (CSeqNo::seqcmp(m_piData1[m_iLastInsertPos], seqno1) < 0))
             i = m_iLastInsertPos;
          else
             i = m_iHead;
 
+         // 查找插入位置
          while ((-1 != m_piNext[i]) && (CSeqNo::seqcmp(m_piData1[m_piNext[i]], seqno1) < 0))
             i = m_piNext[i];
 
+         // m_piData2尚未赋值，或者seqno2大于m_piData2中已保存的终止序列号，说明没有重叠的节点，需要新建节点
          if ((-1 == m_piData2[i]) || (CSeqNo::seqcmp(m_piData2[i], seqno1) < 0))
          {
             m_iLastInsertPos = loc;
 
             // no overlap, create new node
+            // 没有重叠的节点，需要新建节点
             m_piData1[loc] = seqno1;
             if (seqno2 != seqno1)
                m_piData2[loc] = seqno2;
 
             m_piNext[loc] = m_piNext[i];
             m_piNext[i] = loc;
-
+            
+            // 丢包统计，按序列号进行统计
             m_iLength += CSeqNo::seqlen(seqno1, seqno2);
          }
          else
@@ -182,9 +203,12 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
             m_iLastInsertPos = i;
 
             // overlap, coalesce with prior node, insert(3, 7) to [2, 5], ... becomes [2, 7]
+            // 有重叠的节点，合并节点
             if (CSeqNo::seqcmp(m_piData2[i], seqno2) < 0)
             {
+               // 丢包统计，按序列号进行统计
                m_iLength += CSeqNo::seqlen(m_piData2[i], seqno2) - 1;
+               // 保存终止序列号
                m_piData2[i] = seqno2;
 
                loc = i;
@@ -199,6 +223,7 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
       m_iLastInsertPos = m_iHead;
 
       // insert to head node
+      // 插入到head节点
       if (seqno2 != seqno1)
       {
          if (-1 == m_piData2[loc])
@@ -219,6 +244,7 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
    }
 
    // coalesce with next node. E.g., [3, 7], ..., [6, 9] becomes [3, 9] 
+   // 与下一个节点合并。例：[3,7]，……，[6,9]变成[3,9]
    while ((-1 != m_piNext[loc]) && (-1 != m_piData2[loc]))
    {
       int i = m_piNext[loc];
@@ -226,6 +252,7 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
       if (CSeqNo::seqcmp(m_piData1[i], CSeqNo::incseq(m_piData2[loc])) <= 0)
       {
          // coalesce if there is overlap
+         // 合并节点
          if (-1 != m_piData2[i])
          {
             if (CSeqNo::seqcmp(m_piData2[i], m_piData2[loc]) > 0)
