@@ -1161,7 +1161,7 @@ int CUDT::recv(char* data, int len)
    // lock_guard
    CGuard recvguard(m_RecvLock);
 
-   // 已经接收到的数据为0
+   // 接收缓冲区中无数据
    if (0 == m_pRcvBuffer->getRcvDataSize())
    {
       // 为什么这里要抛出异常

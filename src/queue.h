@@ -59,6 +59,8 @@ struct CUnit
    int m_iFlag;			// 0: free, 1: occupied, 2: msg read but not freed (out-of-order), 3: msg dropped
 };
 
+// 使用一个循环队列来存储数据包，队列中的每个节点都是一个固定容量的packet队列
+// 堆空间扩容就是增加一个固定容量的packet队列
 class CUnitQueue
 {
 friend class CRcvQueue;
@@ -89,7 +91,7 @@ public:
       // Returned value:
       //    0: success, -1: failure.
 
-   // 增加队列长度
+   // 增加堆空间容量
    int increase();
 
       // Functionality:
@@ -99,7 +101,7 @@ public:
       // Returned value:
       //    0: success, -1: failure.
 
-   // 减小队列长度，减半
+   // 缩减堆空间容量，暂未实现
    int shrink();
 
       // Functionality:
@@ -109,7 +111,7 @@ public:
       // Returned value:
       //    Pointer to the available unit, NULL if not found.
 
-   // 为传入的数据包分配一个可用单元
+   // 找到一个空闲的数据单元，用来存储packet
    CUnit* getNextAvailUnit();
 
 private:
@@ -133,7 +135,7 @@ private:
 
    // 队列中的packet总数
    int m_iSize;			// total size of the unit queue, in number of packets
-   // 队列中有效的packet总数，即有多少节点处于非空闲状态
+   // 已分配的数据单元统计
    int m_iCount;		// total number of valid packets in the queue
 
    // // 队列中每个packet的最大长度

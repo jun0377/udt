@@ -212,30 +212,37 @@ int CUnitQueue::shrink()
 
 CUnit* CUnitQueue::getNextAvailUnit()
 {
+   // m_iCount > 0.9 * m_iSize; 即堆空间的使用率超过了90%，需要扩容
    if (m_iCount * 10 > m_iSize * 9)
       increase();
 
+   // 堆空间已满
    if (m_iCount >= m_iSize)
       return NULL;
 
+   // 队列入口
    CQEntry* entrance = m_pCurrQueue;
 
    do
    {
+      // 从m_pAvailUnit开始，遍历队列，找到一个未使用的数据单元
       for (CUnit* sentinel = m_pCurrQueue->m_pUnit + m_pCurrQueue->m_iSize - 1; m_pAvailUnit != sentinel; ++ m_pAvailUnit)
          if (m_pAvailUnit->m_iFlag == 0)
             return m_pAvailUnit;
 
+      // 检查当前队列的第一个数据单元是否可用, why ???
       if (m_pCurrQueue->m_pUnit->m_iFlag == 0)
       {
          m_pAvailUnit = m_pCurrQueue->m_pUnit;
          return m_pAvailUnit;
       }
 
+      // 当前队列中没有可用的数据单元，遍历下一个队列
       m_pCurrQueue = m_pCurrQueue->m_pNext;
       m_pAvailUnit = m_pCurrQueue->m_pUnit;
    } while (m_pCurrQueue != entrance);
 
+   // 没有找到可用的数据单元，需要扩容
    increase();
 
    return NULL;

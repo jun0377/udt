@@ -178,6 +178,7 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// 使用一个环形缓冲区来管理接收到的数据
 class CRcvBuffer
 {
 public:
@@ -192,6 +193,7 @@ public:
       // Returned value:
       //    0 is success, -1 if data is repeated.
 
+   // 向接收缓冲区中写数据，每次写入一个数据单元
    int addData(CUnit* unit, int offset);
 
       // Functionality:
@@ -202,7 +204,7 @@ public:
       // Returned value:
       //    size of data read.
 
-   // 读数据到用户空间
+   // 从接收缓冲区中读数据
    int readBuffer(char* data, int len);
 
       // Functionality:
@@ -223,6 +225,7 @@ public:
       // Returned value:
       //    1 if a user buffer is fulfilled, otherwise 0.
 
+   // 更新已通过ACK确认数据的位置
    void ackData(int len);
 
       // Functionality:
@@ -231,7 +234,8 @@ public:
       //    None.
       // Returned value:
       //    size of available buffer space (including user buffer) for data receiving.
-
+   
+   // 缓冲区中还有多少空间可用
    int getAvailBufSize() const;
 
       // Functionality:
@@ -241,7 +245,7 @@ public:
       // Returned value:
       //    size of valid (continous) data for reading.
 
-   // 已经接收到的数据
+   // 缓冲区中有多少数据可读
    int getRcvDataSize() const;
 
       // Functionality:
@@ -251,6 +255,7 @@ public:
       // Returned value:
       //    None.
 
+   // 需要丢弃的包
    void dropMsg(int32_t msgno);
 
       // Functionality:
@@ -276,16 +281,20 @@ private:
    bool scanMsg(int& start, int& end, bool& passack);
 
 private:
+   // 数据单元
    CUnit** m_pUnit;                     // pointer to the protocol buffer
+   // 数据长度
    int m_iSize;                         // size of the protocol buffer
    CUnitQueue* m_pUnitQueue;		// the shared unit queue
 
-   // I/O空间的头位置
+   // 接收缓冲区中数据的起始位置
    int m_iStartPos;                     // the head position for I/O (inclusive)
+   // 最后一个被ACK确认的数据位置
    int m_iLastAckPos;                   // the last ACKed position (exclusive)
 					// EMPTY: m_iStartPos = m_iLastAckPos   FULL: m_iStartPos = m_iLastAckPos + 1
+   // 最远数据位置，空：m_iStartPos = m_iLastAckPos； 满：m_iStartPos = m_iLastAckPos + 1
    int m_iMaxPos;			// the furthest data position
-
+   // 在处理当前单元时，m_iNotch 用于记录已经读取了多少数据。这样，如果一次读取没有读取完整个单元的数据，下次可以从这个偏移量继
    int m_iNotch;			// the starting read point of the first unit
 
 private:

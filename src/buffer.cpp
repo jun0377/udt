@@ -365,7 +365,9 @@ m_iLastAckPos(0),
 m_iMaxPos(0),
 m_iNotch(0)
 {
+   // 数据单元指针数组
    m_pUnit = new CUnit* [m_iSize];
+   // 数据单元指针数组初始化
    for (int i = 0; i < m_iSize; ++ i)
       m_pUnit[i] = NULL;
 }
@@ -386,16 +388,22 @@ CRcvBuffer::~CRcvBuffer()
 
 int CRcvBuffer::addData(CUnit* unit, int offset)
 {
+   // 新增数据的位置
    int pos = (m_iLastAckPos + offset) % m_iSize;
+   // 更新最远数据的位置
    if (offset > m_iMaxPos)
       m_iMaxPos = offset;
 
+   // 数据单元已被占用
    if (NULL != m_pUnit[pos])
       return -1;
    
+   // 存储数据
    m_pUnit[pos] = unit;
 
+   // 更新数据单元状态为被占用状态
    unit->m_iFlag = 1;
+   // 被占用的数据单元统计
    ++ m_pUnitQueue->m_iCount;
 
    return 0;
@@ -403,21 +411,31 @@ int CRcvBuffer::addData(CUnit* unit, int offset)
 
 int CRcvBuffer::readBuffer(char* data, int len)
 {
+   // 接收缓冲区读起始位置
    int p = m_iStartPos;
+   // 接收缓冲区中最新一个已确认的数据单元位置，即读结束位置
    int lastack = m_iLastAckPos;
+   // 剩余需要读取的字节数
    int rs = len;
 
    while ((p != lastack) && (rs > 0))
    {
+      // 数据单元中包的长度
+      // 在处理当前单元时，m_iNotch 用于记录已经读取了多少数据。这样，如果一次读取没有读取完整个单元的数据，下次可以从这个偏移量继续
       int unitsize = m_pUnit[p]->m_Packet.getLength() - m_iNotch;
+      // 不要超出用户buffer的长度
       if (unitsize > rs)
          unitsize = rs;
 
+      // 拷贝数据
       memcpy(data, m_pUnit[p]->m_Packet.m_pcData + m_iNotch, unitsize);
+      // 数据偏移量
       data += unitsize;
 
+      // 数据单元中的数据已经被拷贝完毕,释放数据单元
       if ((rs > unitsize) || (rs == m_pUnit[p]->m_Packet.getLength() - m_iNotch))
       {
+         // 释放数据单元
          CUnit* tmp = m_pUnit[p];
          m_pUnit[p] = NULL;
          tmp->m_iFlag = 0;
@@ -425,11 +443,14 @@ int CRcvBuffer::readBuffer(char* data, int len)
 
          if (++ p == m_iSize)
             p = 0;
-
+         
+         // 读取了一个完整的数据单元，偏移量设置为0
          m_iNotch = 0;
       }
-      else
+      else{
+         // 一个数据单元没有被完全读取，记录偏移量，下次可以从这个偏移量继续
          m_iNotch += rs;
+      }
 
       rs -= unitsize;
    }
@@ -440,50 +461,69 @@ int CRcvBuffer::readBuffer(char* data, int len)
 
 int CRcvBuffer::readBufferToFile(fstream& ofs, int len)
 {
+   // 读数据起始位置
    int p = m_iStartPos;
+   // 最后一条确认的数据单元位置
    int lastack = m_iLastAckPos;
+   // 剩余需要读取的字节数
    int rs = len;
 
    while ((p != lastack) && (rs > 0))
    {
+      // 待读取的数据长度
       int unitsize = m_pUnit[p]->m_Packet.getLength() - m_iNotch;
+      // 更新需要读取的字节数
       if (unitsize > rs)
          unitsize = rs;
 
+      // 写入文件
       ofs.write(m_pUnit[p]->m_Packet.m_pcData + m_iNotch, unitsize);
       if (ofs.fail())
          break;
 
+      // 可以读取一个完整的数据单元
       if ((rs > unitsize) || (rs == m_pUnit[p]->m_Packet.getLength() - m_iNotch))
       {
+         // 释放数据单元
          CUnit* tmp = m_pUnit[p];
          m_pUnit[p] = NULL;
          tmp->m_iFlag = 0;
          -- m_pUnitQueue->m_iCount;
 
+         // 循环队列
          if (++ p == m_iSize)
             p = 0;
 
+         // 取了一个完整的数据单元，偏移量设置为
          m_iNotch = 0;
       }
-      else
+      // 没有读取一个完整的数据单元，记录偏移量，下次继续读取
+      else{
          m_iNotch += rs;
+      }
 
+      // 剩余需要读取的字节数
       rs -= unitsize;
    }
 
+   // 更新读起始位置
    m_iStartPos = p;
 
+   // 返回成功读取的字节数
    return len - rs;
 }
 
 void CRcvBuffer::ackData(int len)
 {
+   // 更新已确认的数据单元位置
    m_iLastAckPos = (m_iLastAckPos + len) % m_iSize;
+   // 最远数据位置
    m_iMaxPos -= len;
+   // 循环
    if (m_iMaxPos < 0)
       m_iMaxPos = 0;
 
+   // 唤醒条件变量
    CTimer::triggerEvent();
 }
 
@@ -495,9 +535,11 @@ int CRcvBuffer::getAvailBufSize() const
 
 int CRcvBuffer::getRcvDataSize() const
 {
+   // 环形缓冲区数据量
    if (m_iLastAckPos >= m_iStartPos)
       return m_iLastAckPos - m_iStartPos;
-
+   
+   // 唤醒缓冲区数据量
    return m_iSize + m_iLastAckPos - m_iStartPos;
 }
 
@@ -559,12 +601,14 @@ int CRcvBuffer::getRcvMsgNum()
 bool CRcvBuffer::scanMsg(int& p, int& q, bool& passack)
 {
    // empty buffer
+   // 接收缓冲区为空
    if ((m_iStartPos == m_iLastAckPos) && (m_iMaxPos <= 0))
       return false;
 
    //skip all bad msgs at the beginning
    while (m_iStartPos != m_iLastAckPos)
    {
+      // 跳过空数据单元
       if (NULL == m_pUnit[m_iStartPos])
       {
          if (++ m_iStartPos == m_iSize)
@@ -572,6 +616,7 @@ bool CRcvBuffer::scanMsg(int& p, int& q, bool& passack)
          continue;
       }
 
+      // 数据单元中有数据并且存在消息边界
       if ((1 == m_pUnit[m_iStartPos]->m_iFlag) && (m_pUnit[m_iStartPos]->m_Packet.getMsgBoundary() > 1))
       {
          bool good = true;
@@ -579,15 +624,18 @@ bool CRcvBuffer::scanMsg(int& p, int& q, bool& passack)
          // look ahead for the whole message
          for (int i = m_iStartPos; i != m_iLastAckPos;)
          {
+            // 获取UDP消息边界失败，说明不是一个完整的包
             if ((NULL == m_pUnit[i]) || (1 != m_pUnit[i]->m_iFlag))
             {
                good = false;
                break;
             }
 
+            // 找到UDP消息的边界
             if ((m_pUnit[i]->m_Packet.getMsgBoundary() == 1) || (m_pUnit[i]->m_Packet.getMsgBoundary() == 3))
                break;
 
+            // 环形缓冲区索引
             if (++ i == m_iSize)
                i = 0;
          }
@@ -596,11 +644,13 @@ bool CRcvBuffer::scanMsg(int& p, int& q, bool& passack)
             break;
       }
 
+      // 释放数据单元
       CUnit* tmp = m_pUnit[m_iStartPos];
       m_pUnit[m_iStartPos] = NULL;
       tmp->m_iFlag = 0;
       -- m_pUnitQueue->m_iCount;
 
+      // 环形缓冲区索引
       if (++ m_iStartPos == m_iSize)
          m_iStartPos = 0;
    }
