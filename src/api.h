@@ -86,7 +86,7 @@ public:
    // CUDT句柄
    CUDT* m_pUDT;                             // pointer to the UDT entity
 
-   // 待处理的sockfd队列
+   // 正在建立连接的sockfd队列
    std::set<UDTSOCKET>* m_pQueuedSockets;    // set of connections waiting for accept()
    // 已建立连接的sockfd队列
    std::set<UDTSOCKET>* m_pAcceptSockets;    // set of accept()ed connections
@@ -188,10 +188,8 @@ public:
 
       // socket APIs
 
-   // 服用一个已有的UDP套接字或创建一个新的UDP套接字
    int bind(const UDTSOCKET u, const sockaddr* name, int namelen);
    int bind(const UDTSOCKET u, UDPSOCKET udpsock);
-   // 创建了两个队列：待处理的连接队列和已连接队列
    int listen(const UDTSOCKET u, int backlog);
    UDTSOCKET accept(const UDTSOCKET listen, sockaddr* addr, int* addrlen);
    int connect(const UDTSOCKET u, const sockaddr* name, int namelen);

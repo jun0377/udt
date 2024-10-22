@@ -52,6 +52,7 @@ written by
 
 class CUDT;
 
+// 数据包及状态：0：空闲，1：已占用，2：已读取但未释放（乱序），3：丢弃MSG
 struct CUnit
 {
    CPacket m_Packet;		// packet
@@ -78,7 +79,7 @@ public:
       // Returned value:
       //    0: success, -1: failure.
 
-   // 初始化
+   // 初始化，开辟堆空间，创建一个循环队列
    int init(int size, int mss, int version);
 
       // Functionality:
@@ -88,7 +89,7 @@ public:
       // Returned value:
       //    0: success, -1: failure.
 
-   // 增加队列长度，成倍增加
+   // 增加队列长度
    int increase();
 
       // Functionality:
@@ -112,36 +113,38 @@ public:
    CUnit* getNextAvailUnit();
 
 private:
-   struct CQEntry
+   struct CQEntry          // CQEntry == Class Queue Entry
    {
-      CUnit* m_pUnit;		// unit queue
-      char* m_pBuffer;		// data buffer
-      int m_iSize;		// size of each queue
+      CUnit* m_pUnit;		// 队列元素指针，unit queue
+      char* m_pBuffer;		// 队列中节点的指针域，指向堆空间，data buffer
+      int m_iSize;		   // 队列中共有多少个节点，size of each queue
 
       CQEntry* m_pNext;
    }
-   // 指向队列中的第一个元素
+   // 队列入口，是一个循环队列
    *m_pQEntry,			// pointer to the first unit queue
    // 指向当前元素
    *m_pCurrQueue,		// pointer to the current available queue
    // 指向队列中的最后一个元素
    *m_pLastQueue;		// pointer to the last unit queue
 
-   // 最近的一个库用单元
+   // 最新的一个可用数据单元
    CUnit* m_pAvailUnit;         // recent available unit
 
    // 队列中的packet总数
    int m_iSize;			// total size of the unit queue, in number of packets
-   // 队列中有效的packet总数
+   // 队列中有效的packet总数，即有多少节点处于非空闲状态
    int m_iCount;		// total number of valid packets in the queue
 
-   // 单位缓冲区大小
+   // // 队列中每个packet的最大长度
    int m_iMSS;			// unit buffer size
    // IPv4 or IPv6
    int m_iIPversion;		// IP version
 
 private:
+   // 仅声明未实现，相当于禁用拷贝赋值
    CUnitQueue(const CUnitQueue&);
+   // 仅声明未实现，相当于赋值运算符
    CUnitQueue& operator=(const CUnitQueue&);
 };
 

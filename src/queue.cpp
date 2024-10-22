@@ -92,6 +92,7 @@ int CUnitQueue::init(int size, int mss, int version)
    {
       tempq = new CQEntry;
       tempu = new CUnit [size];
+      // 真正存储数据的堆空间
       tempb = new char [size * mss];
    }
    catch (...)
@@ -103,22 +104,31 @@ int CUnitQueue::init(int size, int mss, int version)
       return -1;
    }
 
+   // 初始化队列
    for (int i = 0; i < size; ++ i)
    {
+      // 队列中的所有节点都为空闲状态
       tempu[i].m_iFlag = 0;
+      // 队列中所有节点的指针域
       tempu[i].m_Packet.m_pcData = tempb + i * mss;
    }
-   tempq->m_pUnit = tempu;
-   tempq->m_pBuffer = tempb;
-   tempq->m_iSize = size;
+   // 队列入口
+   tempq->m_pUnit = tempu;          // 队列入口指针
+   tempq->m_pBuffer = tempb;        // 真正存储数据的堆空间
+   tempq->m_iSize = size;           // 队列中共有多少个节点
 
    m_pQEntry = m_pCurrQueue = m_pLastQueue = tempq;
+   // 循环队列
    m_pQEntry->m_pNext = m_pQEntry;
 
+   // 可用的数据单元
    m_pAvailUnit = m_pCurrQueue->m_pUnit;
 
+   // 队列中的packet总数
    m_iSize = size;
+   // 队列中每个packet的最大长度
    m_iMSS = mss;
+   // IPv4/IPv6
    m_iIPversion = version;
 
    return 0;
@@ -129,19 +139,26 @@ int CUnitQueue::increase()
    // adjust/correct m_iCount
    int real_count = 0;
    CQEntry* p = m_pQEntry;
+   // 遍历队列，统计处于有多少数据单元出于非空闲状态
    while (p != NULL)
    {
+      // 队列中的数据单元
       CUnit* u = p->m_pUnit;
+      // 遍历队列中的数据单元
       for (CUnit* end = u + p->m_iSize; u != end; ++ u)
+         // 统计处于有多少数据单元出于非空闲状态
          if (u->m_iFlag != 0)
             ++ real_count;
 
+      // 遍历到了队尾
       if (p == m_pLastQueue)
          p = NULL;
       else
          p = p->m_pNext;
    }
+   // 有多少节点处于非空闲状态
    m_iCount = real_count;
+   // 如果队列中处于非空闲状态的数据单元比例小于90%，则认为不需要增加队列容量
    if (double(m_iCount) / m_iSize < 0.9)
       return -1;
 
@@ -150,8 +167,10 @@ int CUnitQueue::increase()
    char* tempb = NULL;
 
    // all queues have the same size
+   // 队列容量
    int size = m_pQEntry->m_iSize;
 
+   // 增加队列容量
    try
    {
       tempq = new CQEntry;

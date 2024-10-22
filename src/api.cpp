@@ -483,9 +483,10 @@ int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHan
 
 CUDT* CUDTUnited::lookup(const UDTSOCKET u)
 {
-   // protects the m_Sockets structure
+   // lock_guard
    CGuard cg(m_ControlLock);
 
+   // 从map中查找UDT对象
    map<UDTSOCKET, CUDTSocket*>::iterator i = m_Sockets.find(u);
 
    if ((i == m_Sockets.end()) || (i->second->m_Status == CLOSED))
@@ -691,11 +692,11 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
 
    // !!only one conection can be set up each time!!
    // 每次只能建立一个连接
-   #ifndef WIN32
+#ifndef WIN32
       // 阻塞，直到获得一个连接请求
       while (!accepted)
       {
-         // 确保一次只处理一个连接请求
+         // 临界区保护，确保一次只处理一个连接请求
          pthread_mutex_lock(&(ls->m_AcceptLock));
 
          // 套接字不可用时，将accepted设置为true,通过这种方式退出循环
@@ -729,13 +730,13 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
             pthread_cond_wait(&(ls->m_AcceptCond), &(ls->m_AcceptLock));
          }
 
-         // 这一步做了什么操作 ???
+         // 待处理的套接字队列为空，将监听套接字从epoll中移除
          if (ls->m_pQueuedSockets->empty())
             m_EPoll.update_events(listen, ls->m_pUDT->m_sPollID, UDT_EPOLL_IN, false);
 
          pthread_mutex_unlock(&(ls->m_AcceptLock));
       }
-   #else
+#else
       while (!accepted)
       {
          WaitForSingleObject(ls->m_AcceptLock, INFINITE);
@@ -766,12 +767,13 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
          if (ls->m_pQueuedSockets->empty())
             m_EPoll.update_events(listen, ls->m_pUDT->m_sPollID, UDT_EPOLL_IN, false);
       }
-   #endif
+#endif
 
    // 没有待处理的连接
    if (u == CUDT::INVALID_SOCK)
    {
       // non-blocking receiving, no connection available
+      // 非阻塞接受，没有可以的连接
       if (!ls->m_pUDT->m_bSynRecving)
          throw CUDTException(6, 2, 0);
 
@@ -779,14 +781,17 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
       throw CUDTException(5, 6, 0);
    }
 
+   // 获取对端地址
    if ((addr != NULL) && (addrlen != NULL))
    {
+      // IPv4/IPv6 地址长度不同
       if (AF_INET == locate(u)->m_iIPversion)
          *addrlen = sizeof(sockaddr_in);
       else
          *addrlen = sizeof(sockaddr_in6);
 
       // copy address information of peer node
+      // 对端地址信息
       memcpy(addr, locate(u)->m_pPeerAddr, *addrlen);
    }
 
@@ -1922,7 +1927,9 @@ int CUDT::recv(UDTSOCKET u, char* buf, int len, int)
 {
    try
    {
+      // 查找UDT对象
       CUDT* udt = s_UDTUnited.lookup(u);
+      // 接收数据
       return udt->recv(buf, len);
    }
    catch (CUDTException e)

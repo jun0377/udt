@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
 
    while (true)
    {
-      // accept
+      // 阻塞接收连接
       if (UDT::INVALID_SOCK == (recver = UDT::accept(serv, (sockaddr*)&clientaddr, &addrlen)))
       {
          cout << "[main] accept: " << UDT::getlasterror().getErrorMessage() << endl;
@@ -104,18 +104,18 @@ int main(int argc, char* argv[])
       char clienthost[NI_MAXHOST];
       char clientservice[NI_MAXSERV];
 
-      // 将IP地址和端口转换为主机名和服务名
+      // 对端IP、端口
       getnameinfo((sockaddr *)&clientaddr, addrlen, clienthost, sizeof(clienthost), clientservice, sizeof(clientservice), NI_NUMERICHOST|NI_NUMERICSERV);
-      cout << "[main] new connection: " << clienthost << ":" << clientservice << endl;
+      cout << "[main] peer addr: " << clienthost << ":" << clientservice << endl;
 
-      // 接收客户端数据
-      #ifndef WIN32
+      // 接收客户端数据的线程
+#ifndef WIN32
          pthread_t rcvthread;
          pthread_create(&rcvthread, NULL, recvdata, new UDTSOCKET(recver));
          pthread_detach(rcvthread);
-      #else
+#else
          CreateThread(NULL, 0, recvdata, new UDTSOCKET(recver), 0, NULL);
-      #endif
+#endif
    }
 
    UDT::close(serv);
@@ -129,6 +129,7 @@ void* recvdata(void* usocket)
 DWORD WINAPI recvdata(LPVOID usocket)
 #endif
 {
+   // 释放线程参数占用的堆空间
    UDTSOCKET recver = *(UDTSOCKET*)usocket;
    delete (UDTSOCKET*)usocket;
 
@@ -144,6 +145,7 @@ DWORD WINAPI recvdata(LPVOID usocket)
       {
          int rcv_size;
          int var_size = sizeof(int);
+         // 获取UDT接收缓冲区大小
          UDT::getsockopt(recver, 0, UDT_RCVDATA, &rcv_size, &var_size);
          if (UDT::ERROR == (rs = UDT::recv(recver, data + rsize, size - rsize, 0)))
          {

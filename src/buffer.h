@@ -280,6 +280,7 @@ private:
    int m_iSize;                         // size of the protocol buffer
    CUnitQueue* m_pUnitQueue;		// the shared unit queue
 
+   // I/O空间的头位置
    int m_iStartPos;                     // the head position for I/O (inclusive)
    int m_iLastAckPos;                   // the last ACKed position (exclusive)
 					// EMPTY: m_iStartPos = m_iLastAckPos   FULL: m_iStartPos = m_iLastAckPos + 1
@@ -288,8 +289,11 @@ private:
    int m_iNotch;			// the starting read point of the first unit
 
 private:
+   // 构造函数私有化，用于单例模式
    CRcvBuffer();
+   // 仅声明未实现，相当于禁用了拷贝赋值操作
    CRcvBuffer(const CRcvBuffer&);
+   // 仅声明未实现，相当于仅用了赋值操作
    CRcvBuffer& operator=(const CRcvBuffer&);
 };
 

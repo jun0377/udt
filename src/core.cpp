@@ -1149,6 +1149,7 @@ int CUDT::recv(char* data, int len)
       throw CUDTException(5, 10, 0);
 
    // throw an exception if not connected
+   // 连接异常时抛出异常
    if (!m_bConnected)
       throw CUDTException(2, 2, 0);
    else if ((m_bBroken || m_bClosing) && (0 == m_pRcvBuffer->getRcvDataSize()))
@@ -1157,6 +1158,7 @@ int CUDT::recv(char* data, int len)
    if (len <= 0)
       return 0;
 
+   // lock_guard
    CGuard recvguard(m_RecvLock);
 
    // 已经接收到的数据为0
@@ -1167,25 +1169,31 @@ int CUDT::recv(char* data, int len)
          throw CUDTException(6, 2, 0);
       else
       {
-         #ifndef WIN32
+#ifndef WIN32
             pthread_mutex_lock(&m_RecvDataLock);
+            // m_iRcvTimeOut < 0说明是阻塞接收，不设超时时间
             if (m_iRcvTimeOut < 0) 
             { 
+               // 连接正常，接收缓冲区中无数据时，睡眠等待
                while (!m_bBroken && m_bConnected && !m_bClosing && (0 == m_pRcvBuffer->getRcvDataSize())){
+                  // 阻塞等待
                   pthread_cond_wait(&m_RecvDataCond, &m_RecvDataLock);
                }
             }
+            // 设置了超时时间
             else
             {
-               // 接收超时时间
+               // 超时时间
                uint64_t exptime = CTimer::getTime() + m_iRcvTimeOut * 1000ULL; 
                timespec locktime; 
     
                locktime.tv_sec = exptime / 1000000;
                locktime.tv_nsec = (exptime % 1000000) * 1000;
 
+               // 连接正常，接收缓冲区中无数据时，睡眠等待,注意是带有超时时间的等待
                while (!m_bBroken && m_bConnected && !m_bClosing && (0 == m_pRcvBuffer->getRcvDataSize()))
                {
+                  // 带有超时时间的等待
                   pthread_cond_timedwait(&m_RecvDataCond, &m_RecvDataLock, &locktime); 
                   if (CTimer::getTime() >= exptime){
                      break;
@@ -1193,7 +1201,7 @@ int CUDT::recv(char* data, int len)
                }
             }
             pthread_mutex_unlock(&m_RecvDataLock);
-         #else
+#else
             if (m_iRcvTimeOut < 0)
             {
                while (!m_bBroken && m_bConnected && !m_bClosing && (0 == m_pRcvBuffer->getRcvDataSize()))
@@ -1211,24 +1219,29 @@ int CUDT::recv(char* data, int len)
                   WaitForSingleObject(m_RecvDataCond, DWORD(m_iRcvTimeOut - diff ));
                }
             }
-         #endif
+#endif
       }
    }
 
    // throw an exception if not connected
+   // 连接异常时抛出异常
    if (!m_bConnected)
       throw CUDTException(2, 2, 0);
    else if ((m_bBroken || m_bClosing) && (0 == m_pRcvBuffer->getRcvDataSize()))
       throw CUDTException(2, 1, 0);
 
+   // 从接收缓冲区中读数据
    int res = m_pRcvBuffer->readBuffer(data, len);
 
+   // 接收缓冲区中数据全部读完了
    if (m_pRcvBuffer->getRcvDataSize() <= 0)
    {
       // read is not available any more
+      // 不再关注套接字的读事件
       s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, UDT_EPOLL_IN, false);
    }
 
+   // 读数据时出错，抛出异常
    if ((res <= 0) && (m_iRcvTimeOut >= 0))
       throw CUDTException(6, 3, 0);
 

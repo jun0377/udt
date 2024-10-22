@@ -90,10 +90,11 @@ int CEPoll::create()
 
    // 描述一个epoll实例
    CEPollDesc desc;
-   // 唯一标识
+   // map中的key
    desc.m_iID = m_iIDSeed;
    // 初始化本地实例为0
    desc.m_iLocalID = localid;
+   // 插入到map中
    m_mPolls[desc.m_iID] = desc;
 
    return desc.m_iID;
@@ -104,7 +105,7 @@ int CEPoll::add_usock(const int eid, const UDTSOCKET& u, const int* events)
    // lock_guard
    CGuard pg(m_EPollLock);
 
-   // 查找epoll实例，不存在则抛出异常
+   // 从map中查找epoll实例，不存在则抛出异常
    map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
    if (p == m_mPolls.end())
       throw CUDTException(5, 13);
@@ -121,12 +122,15 @@ int CEPoll::add_usock(const int eid, const UDTSOCKET& u, const int* events)
 
 int CEPoll::add_ssock(const int eid, const SYSSOCKET& s, const int* events)
 {
+   // lock_guard
    CGuard pg(m_EPollLock);
 
+   // 从map中查找epoll实例
    map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
    if (p == m_mPolls.end())
       throw CUDTException(5, 13);
 
+   // 添加系统套接字到epoll实例中
 #ifdef LINUX
    epoll_event ev;
    memset(&ev, 0, sizeof(epoll_event));
@@ -156,12 +160,15 @@ int CEPoll::add_ssock(const int eid, const SYSSOCKET& s, const int* events)
 
 int CEPoll::remove_usock(const int eid, const UDTSOCKET& u)
 {
+   // lock_guard
    CGuard pg(m_EPollLock);
 
+   // 从map中查找epoll实例
    map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
    if (p == m_mPolls.end())
       throw CUDTException(5, 13);
 
+   // 清空相应的读/写/异常套接字集合
    p->second.m_sUDTSocksIn.erase(u);
    p->second.m_sUDTSocksOut.erase(u);
    p->second.m_sUDTSocksEx.erase(u);
@@ -171,18 +178,22 @@ int CEPoll::remove_usock(const int eid, const UDTSOCKET& u)
 
 int CEPoll::remove_ssock(const int eid, const SYSSOCKET& s)
 {
+   // lock_guard
    CGuard pg(m_EPollLock);
 
+   // 从map中查找epoll实例
    map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
    if (p == m_mPolls.end())
       throw CUDTException(5, 13);
 
+   // 调用系统API删除系统套接字
 #ifdef LINUX
    epoll_event ev;  // ev is ignored, for compatibility with old Linux kernel only.
    if (::epoll_ctl(p->second.m_iLocalID, EPOLL_CTL_DEL, s, &ev) < 0)
       throw CUDTException();
 #endif
 
+   // 从系统套接字集合中删除
    p->second.m_sLocals.erase(s);
 
    return 0;
@@ -200,13 +211,17 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
    if (lrfds) lrfds->clear();
    if (lwfds) lwfds->clear();
 
+   // 记录已准备好的套接字
    int total = 0;
 
+   // 获取当前时间
    int64_t entertime = CTimer::getTime();
    while (true)
    {
+      // 临界区保护
       CGuard::enterCS(m_EPollLock);
 
+      // 查找epoll实例
       map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
       if (p == m_mPolls.end())
       {
@@ -214,6 +229,7 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          throw CUDTException(5, 13);
       }
 
+      // 没有需要关注的套接字，退出临界区
       if (p->second.m_sUDTSocksIn.empty() && p->second.m_sUDTSocksOut.empty() && p->second.m_sLocals.empty() && (msTimeOut < 0))
       {
          // no socket is being monitored, this may be a deadlock
@@ -222,13 +238,16 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
       }
 
       // Sockets with exceptions are returned to both read and write sets.
+      // 将关注异常事件的套接字插入到关注可读事件的套接字集合中
       if ((NULL != readfds) && (!p->second.m_sUDTReads.empty() || !p->second.m_sUDTExcepts.empty()))
       {
          *readfds = p->second.m_sUDTReads;
          for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
             readfds->insert(*i);
+         // Q:既然tatal返回的是已经准备好的套接字数量，这里为什么要赋值？
          total += p->second.m_sUDTReads.size() + p->second.m_sUDTExcepts.size();
       }
+      // 将关注异常事件的套接字插入到关注可写事件的套接字集合中
       if ((NULL != writefds) && (!p->second.m_sUDTWrites.empty() || !p->second.m_sUDTExcepts.empty()))
       {
          *writefds = p->second.m_sUDTWrites;
@@ -237,28 +256,36 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          total += p->second.m_sUDTWrites.size() + p->second.m_sUDTExcepts.size();
       }
 
-      //　系统套接字
+      //　系统套接字 localreaadfds/localwritefds
       if (lrfds || lwfds)
       {
-         #ifdef LINUX
+#ifdef LINUX
+         // 关注的套接字数量
          const int max_events = p->second.m_sLocals.size();
+         // 返回的epoll_event数组
          epoll_event ev[max_events];
+         // epoll_wait,不设超时时间，阻塞等待
          int nfds = ::epoll_wait(p->second.m_iLocalID, ev, max_events, 0);
 
+         // 返回的epoll_event
          for (int i = 0; i < nfds; ++ i)
          {
+            // 可读事件
             if ((NULL != lrfds) && (ev[i].events & EPOLLIN))
             {
+               // 向外传出可读套接字
                lrfds->insert(ev[i].data.fd);
                ++ total;
             }
+            // 可写事件
             if ((NULL != lwfds) && (ev[i].events & EPOLLOUT))
             {
+               // 向外传出可写套接字
                lwfds->insert(ev[i].data.fd);
                ++ total;
             }
          }
-         #else
+#else
          //currently "select" is used for all non-Linux platforms.
          //faster approaches can be applied for specific systems in the future.
 
@@ -296,17 +323,20 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
                }
             }
          }
-         #endif
+#endif
       }
 
+      // 退出临界区
       CGuard::leaveCS(m_EPollLock);
 
       if (total > 0)
          return total;
 
+      // 超时，抛出异常
       if ((msTimeOut >= 0) && (int64_t(CTimer::getTime() - entertime) >= msTimeOut * 1000LL))
          throw CUDTException(6, 3, 0);
 
+      // 阻塞等待，最多等待10ms
       CTimer::waitForEvent();
    }
 
@@ -315,17 +345,21 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
 
 int CEPoll::release(const int eid)
 {
+   // lock_guard
    CGuard pg(m_EPollLock);
 
+   // 查找epoll实例
    map<int, CEPollDesc>::iterator i = m_mPolls.find(eid);
    if (i == m_mPolls.end())
       throw CUDTException(5, 13);
 
    #ifdef LINUX
    // release local/system epoll descriptor
+   // 调用系统API关闭epoll实例
    ::close(i->second.m_iLocalID);
    #endif
 
+   // 从map中清除对应的epoll实例
    m_mPolls.erase(i);
 
    return 0;
@@ -336,10 +370,12 @@ namespace
 
 void update_epoll_sets(const UDTSOCKET& uid, const set<UDTSOCKET>& watch, set<UDTSOCKET>& result, bool enable)
 {
+   // 插入套接字
    if (enable && (watch.find(uid) != watch.end()))
    {
       result.insert(uid);
    }
+   // 删除套接字
    else if (!enable)
    {
       result.erase(uid);
@@ -350,20 +386,27 @@ void update_epoll_sets(const UDTSOCKET& uid, const set<UDTSOCKET>& watch, set<UD
 
 int CEPoll::update_events(const UDTSOCKET& uid, std::set<int>& eids, int events, bool enable)
 {
+   // lock_guard
    CGuard pg(m_EPollLock);
 
    map<int, CEPollDesc>::iterator p;
-
+   
+   // 记录已删除的epoll实例
    vector<int> lost;
+   // 遍历所有的epoll实例
    for (set<int>::iterator i = eids.begin(); i != eids.end(); ++ i)
    {
+      // 查找指定的epoll实例
       p = m_mPolls.find(*i);
+      // 没有在map中找到对应的epoll实例，说明已经被删除了
       if (p == m_mPolls.end())
       {
+         // 记录已删除的epoll实例
          lost.push_back(*i);
       }
       else
       {
+         // 更新套接字对应的事件
          if ((events & UDT_EPOLL_IN) != 0)
             update_epoll_sets(uid, p->second.m_sUDTSocksIn, p->second.m_sUDTReads, enable);
          if ((events & UDT_EPOLL_OUT) != 0)
@@ -373,6 +416,7 @@ int CEPoll::update_events(const UDTSOCKET& uid, std::set<int>& eids, int events,
       }
    }
 
+   // 删除epoll实例
    for (vector<int>::iterator i = lost.begin(); i != lost.end(); ++ i)
       eids.erase(*i);
 

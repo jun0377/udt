@@ -304,7 +304,7 @@ private: // Options
    bool m_bRendezvous;                          // Rendezvous connection mode
    // 发送超时
    int m_iSndTimeOut;                           // sending timeout in milliseconds
-   // 接收超时
+   // 接收超时，m_iRcvTimeOut < 0说明是阻塞接收
    int m_iRcvTimeOut;                           // receiving timeout in milliseconds
    // 端口复用
    bool m_bReuseAddr;				// reuse an exiting port or not, for UDP multiplexer

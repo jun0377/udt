@@ -58,7 +58,7 @@ struct CEPollDesc
    // 关注异常事件的sockfd
    std::set<UDTSOCKET> m_sUDTSocksEx;        // set of UDT sockets waiting for exceptions
 
-   // 系统epoll实例
+   // 系统API创建的epoll实例
    int m_iLocalID;                           // local system epoll ID
    // 系统套接字，不是UDT套接字
    std::set<SYSSOCKET> m_sLocals;            // set of local (non-UDT) descriptors
@@ -89,7 +89,7 @@ public: // for CUDTUnited API
       // Returned value:
       //    new EPoll ID if success, otherwise an error number.
 
-   // 创建一个UDT epoll实例
+   // 调用系统API epoll_create创建一个epoll实例，并将其添加到map中
    int create();
 
       // Functionality:
@@ -150,7 +150,7 @@ public: // for CUDTUnited API
       // Returned value:
       //    number of sockets available for IO.
 
-   // 等待epoll事件或超时
+   // 等待epoll事件或超时；
    int wait(const int eid, std::set<UDTSOCKET>* readfds, std::set<UDTSOCKET>* writefds, int64_t msTimeOut, std::set<SYSSOCKET>* lrfds, std::set<SYSSOCKET>* lwfds);
 
       // Functionality:
@@ -179,12 +179,13 @@ public: // for CUDT to acknowledge IO status
    int update_events(const UDTSOCKET& uid, std::set<int>& eids, int events, bool enable);
 
 private:
-   // epoll实例的表示
+   // epoll实例的标识
    int m_iIDSeed;                            // seed to generate a new ID
    pthread_mutex_t m_SeedLock;
 
    // 使用一个map来保存所有的UDT epoll实例
    std::map<int, CEPollDesc> m_mPolls;       // all epolls
+   // 同步访问
    pthread_mutex_t m_EPollLock;
 };
 
