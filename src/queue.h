@@ -495,26 +495,32 @@ public:
 
 private:
 #ifndef WIN32
+   // 用于处理数据接收的工作线程
    static void* worker(void* param);
 #else
    static DWORD WINAPI worker(LPVOID param);
 #endif
 
+   // 用于处理数据接收的工作线程ID
    pthread_t m_WorkerThread;
 
 private:
-   // 已接收到的数据包队列
+   // 存储接收到数据包的队列
    CUnitQueue m_UnitQueue;		// The received packet queue
 
    // UDT实例列表
    CRcvUList* m_pRcvUList;		// List of UDT instances that will read packets from the queue
+   // 用于查找UDT套接字
    CHash* m_pHash;			// Hash table for UDT socket looking up
+   // 关联的UDP通道
    CChannel* m_pChannel;		// UDP channel for receving packets
+   // 定时器
    CTimer* m_pTimer;			// shared timer with the snd queue
 
-   // packet负载大小
+   // 数据包负载大小
    int m_iPayloadSize;                  // packet payload size
 
+   // 工作线程是否正在关闭
    volatile bool m_bClosing;            // closing the workder
    pthread_cond_t m_ExitCond;
 
@@ -536,11 +542,14 @@ private:
    void storePkt(int32_t id, CPacket* pkt);
 
 private:
-   // m_pListener的保护锁
+   // 同步访问，临界区保护
    pthread_mutex_t m_LSLock;
+   // 指向监听的UDT实例
    CUDT* m_pListener;                                   // pointer to the (unique, if any) listening UDT entity
+   // 管理交汇连接模式的队列
    CRendezvousQueue* m_pRendezvousQueue;                // The list of sockets in rendezvous mode
 
+   // 存储新的UDT实例
    std::vector<CUDT*> m_vNewEntry;                      // newly added entries, to be inserted
    pthread_mutex_t m_IDLock;
 

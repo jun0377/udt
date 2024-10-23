@@ -49,6 +49,7 @@ written by
 #include "udt.h"
 
 
+// 记录和管理ACK数据，从而帮助计算往返时间RTT以及数据包的传输状态
 class CACKWindow
 {
 public:
@@ -63,6 +64,7 @@ public:
       // Returned value:
       //    None.
 
+   // 向窗口中写入一条记录
    void store(int32_t seq, int32_t ack);
 
       // Functionality:
@@ -73,24 +75,34 @@ public:
       // Returned value:
       //    RTT.
 
+   // 在窗口中查找指定的 ACK-2 序列号，并计算往返时间 (RTT)
    int acknowledge(int32_t seq, int32_t& ack);
 
 private:
+   // 记录序列号的数组
    int32_t* m_piACKSeqNo;       // Seq. No. for the ACK packet
+   // 记录ACK的数组
    int32_t* m_piACK;            // Data Seq. No. carried by the ACK packet
+   // 记录发送时间戳，用来计算RTT
    uint64_t* m_pTimeStamp;      // The timestamp when the ACK was sent
 
+   // 窗口大小
    int m_iSize;                 // Size of the ACK history window
+   // 指向最新的包
    int m_iHead;                 // Pointer to the lastest ACK record
+   // 指向最旧的包
    int m_iTail;                 // Pointer to the oldest ACK record
 
 private:
+   // 仅声明未实现，相当于禁用拷贝构造
    CACKWindow(const CACKWindow&);
+   // 仅声明未实现，相当于禁用赋值运算
    CACKWindow& operator=(const CACKWindow&);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// 用于记录和估计数据包发送和接收时间信息的类。它提供了计算最小发送间隔、接收速度和带宽的功能
 class CPktTimeWindow
 {
 public:
@@ -104,6 +116,7 @@ public:
       // Returned value:
       //    minimum packet sending interval (microseconds).
 
+   // 最小的包发送间隔
    int getMinPktSndInt() const;
 
       // Functionality:
@@ -113,6 +126,7 @@ public:
       // Returned value:
       //    Packet arrival speed (packets per second).
 
+   // 计算接收速率：每秒多少个包
    int getPktRcvSpeed() const;
 
       // Functionality:
@@ -122,6 +136,7 @@ public:
       // Returned value:
       //    Estimated bandwidth (packets per second).
 
+   // 估算带宽,每秒多少个包
    int getBandwidth() const;
 
       // Functionality:
@@ -131,6 +146,7 @@ public:
       // Returned value:
       //    None.
 
+   // 发送时调用，记录报文发送的时间戳
    void onPktSent(int currtime);
 
       // Functionality:
@@ -140,6 +156,7 @@ public:
       // Returned value:
       //    None.
 
+   // 接收时调用，记录报文接收时的时间戳
    void onPktArrival();
 
       // Functionality:
@@ -149,6 +166,7 @@ public:
       // Returned value:
       //    None.
 
+   // 记录第一个探测报文到达的时间戳，其实就是当前时间戳
    void probe1Arrival();
 
       // Functionality:
@@ -157,24 +175,37 @@ public:
       //    None.
       // Returned value:
       //    None.
-
+   
+   // 记录第二个探测报文到达的时间和报文对之间的间隔
    void probe2Arrival();
 
 private:
+   // 接收速率统计窗口
    int m_iAWSize;               // size of the packet arrival history window
+   // 指向一个int数组，记录两个报文间的接收时间间隔，以微秒为单位，用于计算接收速度和估算带宽
    int* m_piPktWindow;          // packet information window
+   // m_piPktWindow的副本，避免直接操作m_piPktWindow
    int* m_piPktReplica;
+   // 指向当前存储位置
    int m_iPktWindowPtr;         // position pointer of the packet info. window.
 
+   // 探测报文窗口
    int m_iPWSize;               // size of probe history window size
+   // 记录探测报文的包间隔
    int* m_piProbeWindow;        // record inter-packet time for probing packet pairs
+   // m_piProbeWindow的副本，避免直接操作m_piProbeWindow
    int* m_piProbeReplica;
+   // 指向当前存储位置
    int m_iProbeWindowPtr;       // position pointer to the probing window
 
+   // 最后一个数据包的发送时间
    int m_iLastSentTime;         // last packet sending time
+   // 包发送的最小间隔
    int m_iMinPktSndInt;         // Minimum packet sending interval
 
+   // 最后一个数据包的接收时间戳
    uint64_t m_LastArrTime;      // last packet arrival time
+   // 报文接收时的时间戳
    uint64_t m_CurrArrTime;      // current packet arrival time
    uint64_t m_ProbeTime;        // arrival time of the first probing packet
 

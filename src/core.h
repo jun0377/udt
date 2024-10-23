@@ -78,12 +78,16 @@ private: // constructor and desctructor
 public: //API
    static int startup();
    static int cleanup();
-   // 创建一个新socket，注意:返回的并不是实际的sockfd，而是sockfd对应的唯一标识符，是一个随机值
+   // 创建一个新UDT socket
    static UDTSOCKET socket(int af, int type = SOCK_STREAM, int protocol = 0);
+   // 将UDT实例和UDP套接字关联起来
    static int bind(UDTSOCKET u, const sockaddr* name, int namelen);
    static int bind(UDTSOCKET u, UDPSOCKET udpsock);
+   // 设置为listener
    static int listen(UDTSOCKET u, int backlog);
+   // 接受连接
    static UDTSOCKET accept(UDTSOCKET u, sockaddr* addr, int* addrlen);
+   // 连接
    static int connect(UDTSOCKET u, const sockaddr* name, int namelen);
    static int close(UDTSOCKET u);
    static int getpeername(UDTSOCKET u, sockaddr* name, int* namelen);
@@ -291,7 +295,7 @@ private: // Options
    int m_iMSS;                                  // Maximum Segment Size, in bytes
    // 同步发送模式,难道是非阻塞模式
    bool m_bSynSending;                          // Sending syncronization mode
-   // 同步接收模式,难道是非阻塞模式
+   // 同步接收模式,难道是阻塞模式
    bool m_bSynRecving;                          // Receiving syncronization mode
    int m_iFlightFlagSize;                       // Maximum number of packets in flight from the peer side
    int m_iSndBufSize;                           // Maximum UDT sender buffer size
@@ -352,8 +356,9 @@ private: // Status
 private: // Sending related data
    // 发送缓冲区
    CSndBuffer* m_pSndBuffer;                    // Sender buffer
-   // 继续丢的包，用于重传
+   // 记录丢的包，用于重传
    CSndLossList* m_pSndLossList;                // Sender loss list
+   // 计算发送速度和带宽
    CPktTimeWindow* m_pSndTimeWindow;            // Packet sending time window
 
    volatile uint64_t m_ullInterval;             // Inter-packet time, in CPU clock cycles
@@ -376,8 +381,11 @@ private: // Sending related data
 private: // Receiving related data
    // 接收缓冲区
    CRcvBuffer* m_pRcvBuffer;                    // Receiver buffer
+   // 接收丢包记录
    CRcvLossList* m_pRcvLossList;                // Receiver loss list
+   // 滑动窗口
    CACKWindow* m_pACKWindow;                    // ACK history window
+   // 计算接收速度和带宽
    CPktTimeWindow* m_pRcvTimeWindow;            // Packet arrival time window
 
    int32_t m_iRcvLastAck;                       // Last sent ACK
@@ -485,13 +493,17 @@ private: // Timers
    void checkTimers();
 
 private: // for UDP multiplexer
-   CSndQueue* m_pSndQueue;			// packet sending queue
-   CRcvQueue* m_pRcvQueue;			// packet receiving queue
-   sockaddr* m_pPeerAddr;			// peer address
-   uint32_t m_piSelfIP[4];			// local UDP IP address
    // 发送队列
-   CSNode* m_pSNode;				// node information for UDT list used in snd queue
+   CSndQueue* m_pSndQueue;			// packet sending queue
    // 接收队列
+   CRcvQueue* m_pRcvQueue;			// packet receiving queue
+   // 对端地址
+   sockaddr* m_pPeerAddr;			// peer address
+   // 本地IP
+   uint32_t m_piSelfIP[4];			// local UDP IP address
+   // 发送队列节点指针
+   CSNode* m_pSNode;				// node information for UDT list used in snd queue
+   // 接收队列节点指针
    CRNode* m_pRNode;                            // node information for UDT list used in rcv queue
 
 private: // for epoll

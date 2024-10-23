@@ -178,11 +178,13 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// 使用一个环形缓冲区来管理接收到的数据
+// 使用一个环形缓冲区来管理接收到的数据，进行数据的接收、缓存、读取、确认等操作
 class CRcvBuffer
 {
 public:
+   // 初始化缓冲区大小和队列指针，并分配内存
    CRcvBuffer(CUnitQueue* queue, int bufsize = 65536);
+   // 释放缓冲区中所有数据单元，清空指针数组
    ~CRcvBuffer();
 
       // Functionality:
@@ -215,7 +217,7 @@ public:
       // Returned value:
       //    size of data read.
 
-   // 读数据到文件
+   // 从接收缓冲区中读数据到文件
    int readBufferToFile(std::fstream& ofs, int len);
 
       // Functionality:
@@ -225,7 +227,7 @@ public:
       // Returned value:
       //    1 if a user buffer is fulfilled, otherwise 0.
 
-   // 更新已通过ACK确认数据的位置
+   // 更新接收缓冲区的确认点
    void ackData(int len);
 
       // Functionality:
@@ -255,7 +257,7 @@ public:
       // Returned value:
       //    None.
 
-   // 需要丢弃的包
+   // 标记需要丢弃的消息
    void dropMsg(int32_t msgno);
 
       // Functionality:
@@ -266,6 +268,7 @@ public:
       // Returned value:
       //    actuall size of data read.
 
+   // 读取一条消息
    int readMsg(char* data, int len);
 
       // Functionality:
@@ -275,24 +278,27 @@ public:
       // Returned value:
       //    number of messages available for recvmsg.
 
+   // 查询有多少条消息可以读取
    int getRcvMsgNum();
 
 private:
+   // 扫描缓冲区，查找完整的消息
    bool scanMsg(int& start, int& end, bool& passack);
 
 private:
-   // 数据单元
+   // 指向缓冲区的指针数组，数组中的每个元素都指向一个数据单元
    CUnit** m_pUnit;                     // pointer to the protocol buffer
-   // 数据长度
+   // 缓冲区大小，即包含的数据单元数
    int m_iSize;                         // size of the protocol buffer
+   // 数据单元队列，用于管理数据单元的分配和释放
    CUnitQueue* m_pUnitQueue;		// the shared unit queue
 
-   // 接收缓冲区中数据的起始位置
+   // 缓冲区中数据的起始位置
    int m_iStartPos;                     // the head position for I/O (inclusive)
-   // 最后一个被ACK确认的数据位置
+   // 缓冲区最后一个被ACK确认的数据位置
    int m_iLastAckPos;                   // the last ACKed position (exclusive)
 					// EMPTY: m_iStartPos = m_iLastAckPos   FULL: m_iStartPos = m_iLastAckPos + 1
-   // 最远数据位置，空：m_iStartPos = m_iLastAckPos； 满：m_iStartPos = m_iLastAckPos + 1
+   // 最远数据位置，表示缓冲区中数据的最大偏移量，空：m_iStartPos = m_iLastAckPos； 满：m_iStartPos = m_iLastAckPos + 1
    int m_iMaxPos;			// the furthest data position
    // 在处理当前单元时，m_iNotch 用于记录已经读取了多少数据。这样，如果一次读取没有读取完整个单元的数据，下次可以从这个偏移量继
    int m_iNotch;			// the starting read point of the first unit

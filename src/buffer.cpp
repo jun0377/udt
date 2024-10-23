@@ -606,9 +606,10 @@ bool CRcvBuffer::scanMsg(int& p, int& q, bool& passack)
       return false;
 
    //skip all bad msgs at the beginning
+   // 跳过缓冲区开头的坏数据单元
    while (m_iStartPos != m_iLastAckPos)
    {
-      // 跳过空数据单元
+      // 跳过空数据单元，直到找到一个有效的消息或到达缓冲区的最后位置
       if (NULL == m_pUnit[m_iStartPos])
       {
          if (++ m_iStartPos == m_iSize)
@@ -616,55 +617,65 @@ bool CRcvBuffer::scanMsg(int& p, int& q, bool& passack)
          continue;
       }
 
-      // 数据单元中有数据并且存在消息边界
+      // 数据单元中有数据并且存在消息边界，则尝试获取一个完整的消息
       if ((1 == m_pUnit[m_iStartPos]->m_iFlag) && (m_pUnit[m_iStartPos]->m_Packet.getMsgBoundary() > 1))
       {
+         // 用于判断消息的完整性
          bool good = true;
 
          // look ahead for the whole message
+         // 从当前位置开始，向后查找消息边界，以获取一个完整的消息
          for (int i = m_iStartPos; i != m_iLastAckPos;)
          {
             // 获取UDP消息边界失败，说明不是一个完整的包
             if ((NULL == m_pUnit[i]) || (1 != m_pUnit[i]->m_iFlag))
             {
+               // 消息不完整
                good = false;
                break;
             }
 
-            // 找到UDP消息的边界
+            // 找到了消息的边界，退出循环
             if ((m_pUnit[i]->m_Packet.getMsgBoundary() == 1) || (m_pUnit[i]->m_Packet.getMsgBoundary() == 3))
                break;
 
-            // 环形缓冲区索引
+            // 更新循环索引，到达缓冲区末尾时回绕
             if (++ i == m_iSize)
                i = 0;
          }
-
+         
+         // 消息完整，退出循环
          if (good)
             break;
       }
 
-      // 释放数据单元
+      // 无论消息是否完整，都要释放数据单元；如果消息完整，向用户返回消息；如果消息不完整，直接丢弃
       CUnit* tmp = m_pUnit[m_iStartPos];
       m_pUnit[m_iStartPos] = NULL;
       tmp->m_iFlag = 0;
       -- m_pUnitQueue->m_iCount;
 
-      // 环形缓冲区索引
+      // 更新起始指针，到达缓冲区末尾时回绕
       if (++ m_iStartPos == m_iSize)
          m_iStartPos = 0;
    }
 
+   // 消息头索引
    p = -1;                  // message head
+   // 消息尾索引
    q = m_iStartPos;         // message tail
+   // passack表示是否越过确认点
    passack = m_iStartPos == m_iLastAckPos;
+   // 是否找到完整消息
    bool found = false;
 
    // looking for the first message
    for (int i = 0, n = m_iMaxPos + getRcvDataSize(); i <= n; ++ i)
    {
+      // 检查数据单元是否有效
       if ((NULL != m_pUnit[q]) && (1 == m_pUnit[q]->m_iFlag))
       {
+         // 是否找到完整消息
          switch (m_pUnit[q]->m_Packet.getMsgBoundary())
          {
          case 3: // 11
@@ -690,23 +701,28 @@ bool CRcvBuffer::scanMsg(int& p, int& q, bool& passack)
       if (found)
       {
          // the msg has to be ack'ed or it is allowed to read out of order, and was not read before
+         // 如果找到完整消息，检查是否已确认或允许乱序读取。如果是，则退出循环；否则，重置 found
          if (!passack || !m_pUnit[q]->m_Packet.getMsgOrderFlag())
             break;
 
          found = false;
       }
 
+      // 更新环形缓冲区索引
       if (++ q == m_iSize)
          q = 0;
 
+      // 找到了ack位置
       if (q == m_iLastAckPos)
          passack = true;
    }
 
    // no msg found
+   // 如果没有找到消息，但消息大于缓冲区，返回部分消息
    if (!found)
    {
       // if the message is larger than the receiver buffer, return part of the message
+      // 消息比缓冲区大，返回部分消息
       if ((p != -1) && ((q + 1) % m_iSize == p))
          found = true;
    }

@@ -87,8 +87,11 @@ CUDT::CUDT()
    m_pSndBuffer = NULL;
    // 接收缓冲区
    m_pRcvBuffer = NULL;
+   // 发送丢包记录
    m_pSndLossList = NULL;
+   // 接收丢包记录
    m_pRcvLossList = NULL;
+   // 滑动窗口，计算接收数据和带宽
    m_pACKWindow = NULL;
    m_pSndTimeWindow = NULL;
    m_pRcvTimeWindow = NULL;
@@ -592,6 +595,7 @@ void CUDT::listen()
 
 void CUDT::connect(const sockaddr* serv_addr)
 {
+   // lock_guard
    CGuard cg(m_ConnectionLock);
 
    if (!m_bOpened)
@@ -604,6 +608,7 @@ void CUDT::connect(const sockaddr* serv_addr)
       throw CUDTException(5, 2, 0);
 
    // record peer/server address
+   // 记录对端IP
    delete m_pPeerAddr;
    m_pPeerAddr = (AF_INET == m_iIPversion) ? (sockaddr*)new sockaddr_in : (sockaddr*)new sockaddr_in6;
    memcpy(m_pPeerAddr, serv_addr, (AF_INET == m_iIPversion) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));

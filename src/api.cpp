@@ -800,13 +800,16 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
 
 int CUDTUnited::connect(const UDTSOCKET u, const sockaddr* name, int namelen)
 {
+   // 从map中查找UDT套接字
    CUDTSocket* s = locate(u);
    if (NULL == s)
       throw CUDTException(5, 4, 0);
 
+   // lock_guard
    CGuard cg(s->m_ControlLock);
 
    // check the size of SOCKADDR structure
+   // IPv4/IPv6的地址长度不同
    if (AF_INET == s->m_iIPversion)
    {
       if (namelen != sizeof(sockaddr_in))
@@ -819,6 +822,7 @@ int CUDTUnited::connect(const UDTSOCKET u, const sockaddr* name, int namelen)
    }
 
    // a socket can "connect" only if it is in INIT or OPENED status
+   // 状态切换 INIT->OPENED->CONNECTING
    if (INIT == s->m_Status)
    {
       if (!s->m_pUDT->m_bRendezvous)
@@ -830,6 +834,7 @@ int CUDTUnited::connect(const UDTSOCKET u, const sockaddr* name, int namelen)
       else
          throw CUDTException(5, 8, 0);
    }
+   // 状态切换 OPENED->CONNECTING
    else if (OPENED != s->m_Status)
       throw CUDTException(5, 2, 0);
 
