@@ -379,21 +379,31 @@ public:
    ~CRendezvousQueue();
 
 public:
+   // 插入一个UDT实例
    void insert(const UDTSOCKET& id, CUDT* u, int ipv, const sockaddr* addr, uint64_t ttl);
+   // 删除一个UDT实例
    void remove(const UDTSOCKET& id);
+   // 检索一个UDT实例
    CUDT* retrieve(const sockaddr* addr, UDTSOCKET& id);
 
+   // 更新连接状态
    void updateConnStatus();
 
 private:
    struct CRL
    {
+      // UDT套接字
       UDTSOCKET m_iID;			// UDT socket ID (self)
+      // UDT实例句柄
       CUDT* m_pUDT;			// UDT instance
+      // IPv4/IPv6
       int m_iIPversion;                 // IP version
+      // 对端地址
       sockaddr* m_pPeerAddr;		// UDT sonnection peer address
+      // 请求过期时间
       uint64_t m_ullTTL;			// the time that this request expires
    };
+   // 处于rendezvous模式的UDT实例list
    std::list<CRL> m_lRendezvousID;      // The sockets currently in rendezvous mode
 
    pthread_mutex_t m_RIDVectorLock;
@@ -546,7 +556,7 @@ private:
    pthread_mutex_t m_LSLock;
    // 指向监听的UDT实例
    CUDT* m_pListener;                                   // pointer to the (unique, if any) listening UDT entity
-   // 管理交汇连接模式的队列
+   // 管理交汇连接模式的队列，P2P模式
    CRendezvousQueue* m_pRendezvousQueue;                // The list of sockets in rendezvous mode
 
    // 存储新的UDT实例

@@ -616,10 +616,12 @@ void CUDT::connect(const sockaddr* serv_addr)
 
    // register this socket in the rendezvous queue
    // RendezevousQueue is used to temporarily store incoming handshake, non-rendezvous connections also require this function
+   // 最大生存时间3s
    uint64_t ttl = 3000000;
    if (m_bRendezvous)
       ttl *= 10;
    ttl += CTimer::getTime();
+   // 将当前UDT实例注册为connector
    m_pRcvQueue->registerConnector(m_SocketID, this, m_iIPversion, serv_addr, ttl);
 
    // This is my current configurations

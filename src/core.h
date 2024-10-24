@@ -373,6 +373,7 @@ private: // Status
 
    CHandShake m_ConnReq;			// connection request
    CHandShake m_ConnRes;			// connection response
+   // 最后一次发送连接请求的时间
    int64_t m_llLastReqTime;			// last time when a connection request is sent
 
 private: // Sending related data

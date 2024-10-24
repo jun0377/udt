@@ -628,6 +628,7 @@ void CSndQueue::init(CChannel* c, CTimer* t)
    #endif
 }
 
+// 握手及控制报文需要通过UDP立即发送到对端，不经过发送缓冲区
 int CSndQueue::sendto(const sockaddr* addr, CPacket& packet)
 {
    // send out the packet immediately (high priority), this is a control packet
@@ -814,7 +815,7 @@ void CHash::remove(int32_t id)
 }
 
 
-//
+// 会合模式
 CRendezvousQueue::CRendezvousQueue():
 m_lRendezvousID(),
 m_RIDVectorLock()
@@ -847,8 +848,10 @@ CRendezvousQueue::~CRendezvousQueue()
 
 void CRendezvousQueue::insert(const UDTSOCKET& id, CUDT* u, int ipv, const sockaddr* addr, uint64_t ttl)
 {
+   // lock_gaurd
    CGuard vg(m_RIDVectorLock);
 
+   // 向list中插入一个UDT实例
    CRL r;
    r.m_iID = id;
    r.m_pUDT = u;
@@ -907,24 +910,31 @@ void CRendezvousQueue::updateConnStatus()
    for (list<CRL>::iterator i = m_lRendezvousID.begin(); i != m_lRendezvousID.end(); ++ i)
    {
       // avoid sending too many requests, at most 1 request per 250ms
+      // 避免发送太多连接请求，每250ms最多发送1个请求
       if (CTimer::getTime() - i->m_pUDT->m_llLastReqTime > 250000)
       {
+         // 已达到ttl时间
          if (CTimer::getTime() >= i->m_ullTTL)
          {
             // connection timer expired, acknowledge app via epoll
+            // 更新连接状态，以及epoll中该套接字的状态
             i->m_pUDT->m_bConnecting = false;
             CUDT::s_UDTUnited.m_EPoll.update_events(i->m_iID, i->m_pUDT->m_sPollID, UDT_EPOLL_ERR, true);
             continue;
          }
 
+         // 创建连接请求数据包
          CPacket request;
          char* reqdata = new char [i->m_pUDT->m_iPayloadSize];
+         // 握手报文封包
          request.pack(0, NULL, reqdata, i->m_pUDT->m_iPayloadSize);
          // ID = 0, connection request
          request.m_iID = !i->m_pUDT->m_bRendezvous ? 0 : i->m_pUDT->m_ConnRes.m_iID;
          int hs_size = i->m_pUDT->m_iPayloadSize;
+         // 握手报文序列化，即按固定格式封包
          i->m_pUDT->m_ConnReq.serialize(reqdata, hs_size);
          request.setLength(hs_size);
+         // 握手报文需要通过UDP立即发送到对端,不经过发送缓冲区
          i->m_pUDT->m_pSndQueue->sendto(i->m_pPeerAddr, request);
          i->m_pUDT->m_llLastReqTime = CTimer::getTime();
          delete [] reqdata;

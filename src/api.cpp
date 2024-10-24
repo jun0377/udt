@@ -844,6 +844,7 @@ int CUDTUnited::connect(const UDTSOCKET u, const sockaddr* name, int namelen)
    s->m_Status = CONNECTING;
    try
    {
+      // connect
       s->m_pUDT->connect(name);
    }
    catch (CUDTException e)
