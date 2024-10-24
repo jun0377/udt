@@ -89,19 +89,32 @@ public: //API
    static UDTSOCKET accept(UDTSOCKET u, sockaddr* addr, int* addrlen);
    // 连接
    static int connect(UDTSOCKET u, const sockaddr* name, int namelen);
+   // 关闭一个UDT socket
    static int close(UDTSOCKET u);
+   // 获取对端地址
    static int getpeername(UDTSOCKET u, sockaddr* name, int* namelen);
+   // 获取本地地址
    static int getsockname(UDTSOCKET u, sockaddr* name, int* namelen);
+   // 获取套接字参数
    static int getsockopt(UDTSOCKET u, int level, UDTOpt optname, void* optval, int* optlen);
+   // 设置套接字参数
    static int setsockopt(UDTSOCKET u, int level, UDTOpt optname, const void* optval, int optlen);
+   // 将数据放入发送缓冲区中
    static int send(UDTSOCKET u, const char* buf, int len, int flags);
+   // 从接收缓冲区中读取数据
    static int recv(UDTSOCKET u, char* buf, int len, int flags);
+   // 将数据放入发送缓冲区中，相较于send,允许设置消息的生存时间和是否顺序发送
    static int sendmsg(UDTSOCKET u, const char* buf, int len, int ttl = -1, bool inorder = false);
+   // 和recvmsg搭配使用
    static int recvmsg(UDTSOCKET u, char* buf, int len);
+   // 发送文件，按块发送
    static int64_t sendfile(UDTSOCKET u, std::fstream& ifs, int64_t& offset, int64_t size, int block = 364000);
+   // 接收文件
    static int64_t recvfile(UDTSOCKET u, std::fstream& ofs, int64_t& offset, int64_t size, int block = 7280000);
+   // 多路复用
    static int select(int nfds, ud_set* readfds, ud_set* writefds, ud_set* exceptfds, const timeval* timeout);
    static int selectEx(const std::vector<UDTSOCKET>& fds, std::vector<UDTSOCKET>* readfds, std::vector<UDTSOCKET>* writefds, std::vector<UDTSOCKET>* exceptfds, int64_t msTimeOut);
+   // epoll
    static int epoll_create();
    static int epoll_add_usock(const int eid, const UDTSOCKET u, const int* events = NULL);
    static int epoll_add_ssock(const int eid, const SYSSOCKET s, const int* events = NULL);
@@ -109,11 +122,15 @@ public: //API
    static int epoll_remove_ssock(const int eid, const SYSSOCKET s);
    static int epoll_wait(const int eid, std::set<UDTSOCKET>* readfds, std::set<UDTSOCKET>* writefds, int64_t msTimeOut, std::set<SYSSOCKET>* lrfds = NULL, std::set<SYSSOCKET>* wrfds = NULL);
    static int epoll_release(const int eid);
+   // 错误处理
    static CUDTException& getlasterror();
+   // 性能监控
    static int perfmon(UDTSOCKET u, CPerfMon* perf, bool clear = true);
+   // 套接字状态
    static UDTSTATUS getsockstate(UDTSOCKET u);
 
 public: // internal API
+   // 根据UDT socket获取CUDT实例
    static CUDT* getUDTHandle(UDTSOCKET u);
 
 private:
@@ -133,6 +150,7 @@ private:
       // Returned value:
       //    None.
 
+   // 监听UDT连接
    void listen();
 
       // Functionality:
@@ -142,6 +160,7 @@ private:
       // Returned value:
       //    None.
 
+   // 连接指定的地址
    void connect(const sockaddr* peer);
 
       // Functionality:
@@ -151,6 +170,7 @@ private:
       // Returned value:
       //    Return 0 if connected, positive value if connection is in progress, otherwise error code.
 
+   // 处理收到的握手包
    int connect(const CPacket& pkt) throw ();
 
       // Functionality:
@@ -293,20 +313,21 @@ private: // Packet sizes
 private: // Options
    // 最大报文段,bytes，默认1500
    int m_iMSS;                                  // Maximum Segment Size, in bytes
-   // 同步发送模式,难道是非阻塞模式
+   // 同步发送模式,阻塞模式
    bool m_bSynSending;                          // Sending syncronization mode
    // 同步接收模式,难道是阻塞模式
    bool m_bSynRecving;                          // Receiving syncronization mode
    int m_iFlightFlagSize;                       // Maximum number of packets in flight from the peer side
+   // 发送缓冲区最大容量
    int m_iSndBufSize;                           // Maximum UDT sender buffer size
    int m_iRcvBufSize;                           // Maximum UDT receiver buffer size
    linger m_Linger;                             // Linger information on close
    int m_iUDPSndBufSize;                        // UDP sending buffer size
    int m_iUDPRcvBufSize;                        // UDP receiving buffer size
    int m_iIPversion;                            // IP version
-   // 什么是交汇连接模式
+   // 什么是交汇连接模式,难道是P2P模式？
    bool m_bRendezvous;                          // Rendezvous connection mode
-   // 发送超时
+   // 发送超时，未设置这个超时时间时，发送会一直阻塞，直到条件变量被唤醒；即阻塞发送
    int m_iSndTimeOut;                           // sending timeout in milliseconds
    // 接收超时，m_iRcvTimeOut < 0说明是阻塞接收
    int m_iRcvTimeOut;                           // receiving timeout in milliseconds
@@ -330,6 +351,7 @@ private: // Status
    volatile bool m_bClosing;                    // If the UDT entity is closing
    volatile bool m_bShutdown;                   // If the peer side has shutdown the connection
    volatile bool m_bBroken;                     // If the connection has been broken
+   // 对端的连接是否正常
    volatile bool m_bPeerHealth;                 // If the peer status is normal
    // UDT sockfd初始化完成
    bool m_bOpened;                              // If the UDT entity has been opened
@@ -405,6 +427,7 @@ private: // synchronization: mutexes and conditions
    pthread_mutex_t m_ConnectionLock;            // used to synchronize connection operation
 
    pthread_cond_t m_SendBlockCond;              // used to block "send" call
+   // 发送数据时保护临界区
    pthread_mutex_t m_SendBlockLock;             // lock associated to m_SendBlockCond
 
    pthread_mutex_t m_AckLock;                   // used to protected sender's loss list when processing ACK
@@ -456,6 +479,7 @@ private: // Trace
    int m_iRecvNAK;                              // number of NAKs received in the last trace interval
    // 上一次统计到最新一次统计间隔的时间
    int64_t m_llSndDuration;			// real time for sending
+   // 记录发送数据用了多长时间
    int64_t m_llSndDurationCounter;		// timers to record the sending duration
 
 private: // Timers

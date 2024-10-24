@@ -598,6 +598,7 @@ void CUDT::connect(const sockaddr* serv_addr)
    // lock_guard
    CGuard cg(m_ConnectionLock);
 
+   // 检查UDT套接字状态
    if (!m_bOpened)
       throw CUDTException(5, 0, 0);
 
@@ -608,7 +609,7 @@ void CUDT::connect(const sockaddr* serv_addr)
       throw CUDTException(5, 2, 0);
 
    // record peer/server address
-   // 记录对端IP
+   // 记录对端IP，IPv4/IPv6
    delete m_pPeerAddr;
    m_pPeerAddr = (AF_INET == m_iIPversion) ? (sockaddr*)new sockaddr_in : (sockaddr*)new sockaddr_in6;
    memcpy(m_pPeerAddr, serv_addr, (AF_INET == m_iIPversion) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
@@ -1038,6 +1039,7 @@ void CUDT::close()
    m_bOpened = false;
 }
 
+// 将数据放入发送缓冲区中，由内部决定何时发送
 int CUDT::send(const char* data, int len)
 {
    if (UDT_DGRAM == m_iSockType)
@@ -1052,8 +1054,10 @@ int CUDT::send(const char* data, int len)
    if (len <= 0)
       return 0;
 
+   // lock_guard
    CGuard sendguard(m_SendLock);
 
+   // 发送缓冲区中没有数据，更新最后响应时间
    if (m_pSndBuffer->getCurrBufSize() == 0)
    {
       // delay the EXP timer to avoid mis-fired timeout
@@ -1062,33 +1066,43 @@ int CUDT::send(const char* data, int len)
       m_ullLastRspTime = currtime;
    }
 
+   // 发送缓冲区中的数据量小于等于发送缓冲区中已使用的数据块容量
+   // 如果是非阻塞发送且缓冲区已满，抛出异常，避免丢包
+   // 如果是阻塞发送，等待缓冲区有空闲位置
    if (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize())
    {
+      // 非阻塞发送
       if (!m_bSynSending)
          throw CUDTException(6, 1, 0);
+      // 阻塞发送
       else
       {
          // wait here during a blocking sending
-         #ifndef WIN32
+#ifndef WIN32
             pthread_mutex_lock(&m_SendBlockLock);
+            // 未设置超时时间，一直阻塞，直到条件变量被唤醒
             if (m_iSndTimeOut < 0) 
             { 
+               // 等待条件变量被唤醒
                while (!m_bBroken && m_bConnected && !m_bClosing && (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize()) && m_bPeerHealth)
                   pthread_cond_wait(&m_SendBlockCond, &m_SendBlockLock);
             }
+            // 设置了超时时间，会一直阻塞到超时
             else
             {
+               // 超时时间
                uint64_t exptime = CTimer::getTime() + m_iSndTimeOut * 1000ULL;
                timespec locktime; 
     
                locktime.tv_sec = exptime / 1000000;
                locktime.tv_nsec = (exptime % 1000000) * 1000;
 
+               // 带有超时时间的等待
                while (!m_bBroken && m_bConnected && !m_bClosing && (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize()) && m_bPeerHealth && (CTimer::getTime() < exptime))
                   pthread_cond_timedwait(&m_SendBlockCond, &m_SendBlockLock, &locktime);
             }
             pthread_mutex_unlock(&m_SendBlockLock);
-         #else
+#else
             if (m_iSndTimeOut < 0)
             {
                while (!m_bBroken && m_bConnected && !m_bClosing && (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize()) && m_bPeerHealth)
@@ -1101,13 +1115,15 @@ int CUDT::send(const char* data, int len)
                while (!m_bBroken && m_bConnected && !m_bClosing && (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize()) && m_bPeerHealth && (CTimer::getTime() < exptime))
                   WaitForSingleObject(m_SendBlockCond, DWORD((exptime - CTimer::getTime()) / 1000)); 
             }
-         #endif
+#endif
 
          // check the connection status
+         // 检查连接状态，如果连接异常，抛出异常
          if (m_bBroken || m_bClosing)
             throw CUDTException(2, 1, 0);
          else if (!m_bConnected)
             throw CUDTException(2, 2, 0);
+         // 检查对端状态
          else if (!m_bPeerHealth)
          {
             m_bPeerHealth = true;
@@ -1116,6 +1132,7 @@ int CUDT::send(const char* data, int len)
       }
    }
 
+   // 再次检查发送缓冲区状态，如果已满，不可发送
    if (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize())
    {
       if (m_iSndTimeOut >= 0)
@@ -1124,20 +1141,25 @@ int CUDT::send(const char* data, int len)
       return 0;
    }
 
+   // 计算需要发送的数据量，byte
    int size = (m_iSndBufSize - m_pSndBuffer->getCurrBufSize()) * m_iPayloadSize;
    if (size > len)
       size = len;
 
    // record total time used for sending
+   // 记录发送数据用了多长时间
    if (0 == m_pSndBuffer->getCurrBufSize())
       m_llSndDurationCounter = CTimer::getTime();
 
    // insert the user buffer into the sening list
+   // 插入要发送的数据到发送队列中
    m_pSndBuffer->addBuffer(data, size);
 
    // insert this socket to snd list if it is not on the list yet
+   // 插入UDT实例到发送队列中
    m_pSndQueue->m_pSndUList->update(this, false);
 
+   // 更新epoll时间状态
    if (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize())
    {
       // write is not available any more
@@ -1259,19 +1281,24 @@ int CUDT::sendmsg(const char* data, int len, int msttl, bool inorder)
       throw CUDTException(5, 9, 0);
 
    // throw an exception if not connected
+   // 连接异常
    if (m_bBroken || m_bClosing)
       throw CUDTException(2, 1, 0);
    else if (!m_bConnected)
       throw CUDTException(2, 2, 0);
 
+   // 待发送的数据长度小于0
    if (len <= 0)
       return 0;
 
+   // 待发送的数据长度大于发送缓冲区大小
    if (len > m_iSndBufSize * m_iPayloadSize)
       throw CUDTException(5, 12, 0);
 
+   // lock_guard
    CGuard sendguard(m_SendLock);
 
+   // 发送缓冲区为空
    if (m_pSndBuffer->getCurrBufSize() == 0)
    {
       // delay the EXP timer to avoid mis-fired timeout
@@ -1280,20 +1307,25 @@ int CUDT::sendmsg(const char* data, int len, int msttl, bool inorder)
       m_ullLastRspTime = currtime;
    }
 
+   // 发送缓冲区中的可用空间小于待发送的数据长度
    if ((m_iSndBufSize - m_pSndBuffer->getCurrBufSize()) * m_iPayloadSize < len)
    {
+      // 非阻塞发送，抛出异常
       if (!m_bSynSending)
          throw CUDTException(6, 1, 0);
+      // 阻塞发送
       else
       {
          // wait here during a blocking sending
-         #ifndef WIN32
+#ifndef WIN32
             pthread_mutex_lock(&m_SendBlockLock);
+            // 一直阻塞，直到条件变量被唤醒
             if (m_iSndTimeOut < 0)
             {
                while (!m_bBroken && m_bConnected && !m_bClosing && ((m_iSndBufSize - m_pSndBuffer->getCurrBufSize()) * m_iPayloadSize < len))
                   pthread_cond_wait(&m_SendBlockCond, &m_SendBlockLock);
             }
+            // 带有超时时间的阻塞
             else
             {
                uint64_t exptime = CTimer::getTime() + m_iSndTimeOut * 1000ULL;
@@ -1306,7 +1338,7 @@ int CUDT::sendmsg(const char* data, int len, int msttl, bool inorder)
                   pthread_cond_timedwait(&m_SendBlockCond, &m_SendBlockLock, &locktime);
             }
             pthread_mutex_unlock(&m_SendBlockLock);
-         #else
+#else
             if (m_iSndTimeOut < 0)
             {
                while (!m_bBroken && m_bConnected && !m_bClosing && ((m_iSndBufSize - m_pSndBuffer->getCurrBufSize()) * m_iPayloadSize < len))
@@ -1319,9 +1351,10 @@ int CUDT::sendmsg(const char* data, int len, int msttl, bool inorder)
                while (!m_bBroken && m_bConnected && !m_bClosing && ((m_iSndBufSize - m_pSndBuffer->getCurrBufSize()) * m_iPayloadSize < len) && (CTimer::getTime() < exptime))
                   WaitForSingleObject(m_SendBlockCond, DWORD((exptime - CTimer::getTime()) / 1000));
             }
-         #endif
+#endif
 
          // check the connection status
+         // 检查连接状态
          if (m_bBroken || m_bClosing)
             throw CUDTException(2, 1, 0);
          else if (!m_bConnected)
@@ -1329,6 +1362,7 @@ int CUDT::sendmsg(const char* data, int len, int msttl, bool inorder)
       }
    }
 
+   // 再次检查发送缓冲区容量是否够用
    if ((m_iSndBufSize - m_pSndBuffer->getCurrBufSize()) * m_iPayloadSize < len)
    {
       if (m_iSndTimeOut >= 0)
@@ -1338,15 +1372,19 @@ int CUDT::sendmsg(const char* data, int len, int msttl, bool inorder)
    }
 
    // record total time used for sending
+   // 记录发送数据一共使用了多长时间
    if (0 == m_pSndBuffer->getCurrBufSize())
       m_llSndDurationCounter = CTimer::getTime();
 
    // insert the user buffer into the sening list
+   // 插入到发送缓冲区
    m_pSndBuffer->addBuffer(data, len, msttl, inorder);
 
    // insert this socket to the snd list if it is not on the list yet
+   // 插入UDT实例到发送队列中
    m_pSndQueue->m_pSndUList->update(this, false);
 
+   // 发送缓冲区容量不足，更新次套接字的epoll状态为不可发送
    if (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize())
    {
       // write is not available any more
@@ -1465,11 +1503,14 @@ int64_t CUDT::sendfile(fstream& ifs, int64_t& offset, int64_t size, int block)
    else if (!m_bConnected)
       throw CUDTException(2, 2, 0);
 
+   // 待发送的数据长度为0，直接返回
    if (size <= 0)
       return 0;
 
+   // lock_guard
    CGuard sendguard(m_SendLock);
 
+   // 发送缓冲区为空
    if (m_pSndBuffer->getCurrBufSize() == 0)
    {
       // delay the EXP timer to avoid mis-fired timeout
@@ -1478,12 +1519,14 @@ int64_t CUDT::sendfile(fstream& ifs, int64_t& offset, int64_t size, int block)
       m_ullLastRspTime = currtime;
    }
 
+   // 待发送的数据量
    int64_t tosend = size;
    int unitsize;
 
    // positioning...
    try
    {
+      // 设置文件偏移量
       ifs.seekg((streamoff)offset);
    }
    catch (...)
@@ -1492,17 +1535,22 @@ int64_t CUDT::sendfile(fstream& ifs, int64_t& offset, int64_t size, int block)
    }
 
    // sending block by block
+   // 按块发送
    while (tosend > 0)
    {
+      // 文件流不可用
       if (ifs.fail())
          throw CUDTException(4, 4);
 
+      // 文件到末尾了
       if (ifs.eof())
          break;
 
+      // 剩余数据量不足一个块
       unitsize = int((tosend >= block) ? block : tosend);
 
       #ifndef WIN32
+         // 等待发送缓冲区可用
          pthread_mutex_lock(&m_SendBlockLock);
          while (!m_bBroken && m_bConnected && !m_bClosing && (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize()) && m_bPeerHealth)
             pthread_cond_wait(&m_SendBlockCond, &m_SendBlockLock);
@@ -1512,6 +1560,7 @@ int64_t CUDT::sendfile(fstream& ifs, int64_t& offset, int64_t size, int block)
             WaitForSingleObject(m_SendBlockCond, INFINITE);
       #endif
 
+      // 检查连接状态
       if (m_bBroken || m_bClosing)
          throw CUDTException(2, 1, 0);
       else if (!m_bConnected)
@@ -1524,11 +1573,14 @@ int64_t CUDT::sendfile(fstream& ifs, int64_t& offset, int64_t size, int block)
       }
 
       // record total time used for sending
+      // 统计发送数据占用了多长时间
       if (0 == m_pSndBuffer->getCurrBufSize())
          m_llSndDurationCounter = CTimer::getTime();
 
+      // 将数据放到发送缓冲区中
       int64_t sentsize = m_pSndBuffer->addBufferFromFile(ifs, unitsize);
 
+      // 更新偏移量
       if (sentsize > 0)
       {
          tosend -= sentsize;
@@ -1536,9 +1588,11 @@ int64_t CUDT::sendfile(fstream& ifs, int64_t& offset, int64_t size, int block)
       }
 
       // insert this socket to snd list if it is not on the list yet
+      // 更新发送队列中的UDT实例
       m_pSndQueue->m_pSndUList->update(this, false);
    }
 
+   // 发送缓冲区已满，更新epoll中相应的套接字状态为不可读
    if (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize())
    {
       // write is not available any more

@@ -377,16 +377,26 @@ UDT_API int startup();
 UDT_API int cleanup();
 // 创建一个新socket，注意:返回的并不是实际的sockfd，而是sockfd对应的唯一标识符，是一个随机值
 UDT_API UDTSOCKET socket(int af, int type, int protocol);
+// 将UDT socket和一个UDP socket绑定
 UDT_API int bind(UDTSOCKET u, const struct sockaddr* name, int namelen);
 UDT_API int bind2(UDTSOCKET u, UDPSOCKET udpsock);
+// 监听UDT socket连接
 UDT_API int listen(UDTSOCKET u, int backlog);
+// 接受UDT socket连接
 UDT_API UDTSOCKET accept(UDTSOCKET u, struct sockaddr* addr, int* addrlen);
+// UDT socket连接
 UDT_API int connect(UDTSOCKET u, const struct sockaddr* name, int namelen);
+// 关闭UDT socket
 UDT_API int close(UDTSOCKET u);
+// 获取对端地址
 UDT_API int getpeername(UDTSOCKET u, struct sockaddr* name, int* namelen);
+// 获取本地地址
 UDT_API int getsockname(UDTSOCKET u, struct sockaddr* name, int* namelen);
+// 获取套接字参数
 UDT_API int getsockopt(UDTSOCKET u, int level, SOCKOPT optname, void* optval, int* optlen);
+// 设置套接字参数
 UDT_API int setsockopt(UDTSOCKET u, int level, SOCKOPT optname, const void* optval, int optlen);
+// 发送数据
 UDT_API int send(UDTSOCKET u, const char* buf, int len, int flags);
 UDT_API int recv(UDTSOCKET u, char* buf, int len, int flags);
 UDT_API int sendmsg(UDTSOCKET u, const char* buf, int len, int ttl = -1, bool inorder = false);

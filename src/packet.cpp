@@ -148,6 +148,7 @@ written by
 
 
 const int CPacket::m_iPktHdrSize = 16;
+// 握手报文固定大小
 const int CHandShake::m_iContentSize = 48;
 
 

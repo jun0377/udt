@@ -1908,6 +1908,7 @@ int CUDT::send(UDTSOCKET u, const char* buf, int len, int)
 {
    try
    {
+      // 从map中找到udt实例
       CUDT* udt = s_UDTUnited.lookup(u);
       return udt->send(buf, len);
    }
@@ -1932,7 +1933,7 @@ int CUDT::recv(UDTSOCKET u, char* buf, int len, int)
 {
    try
    {
-      // 查找UDT对象
+      // 查找UDT实例
       CUDT* udt = s_UDTUnited.lookup(u);
       // 接收数据
       return udt->recv(buf, len);
@@ -1953,6 +1954,7 @@ int CUDT::sendmsg(UDTSOCKET u, const char* buf, int len, int ttl, bool inorder)
 {
    try
    {
+      // 查找UDT实例
       CUDT* udt = s_UDTUnited.lookup(u);
       return udt->sendmsg(buf, len, ttl, inorder);
    }
@@ -1996,6 +1998,7 @@ int64_t CUDT::sendfile(UDTSOCKET u, fstream& ifs, int64_t& offset, int64_t size,
 {
    try
    {
+      // 从map中查找udt实例
       CUDT* udt = s_UDTUnited.lookup(u);
       return udt->sendfile(ifs, offset, size, block);
    }

@@ -217,26 +217,38 @@ protected:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// 握手报文，固定大小：48byte
 class CHandShake
 {
 public:
    CHandShake();
 
+   // 按固定格式封包
    int serialize(char* buf, int& size);
+   // 解包
    int deserialize(const char* buf, int size);
 
 public:
    static const int m_iContentSize;	// Size of hand shake data
 
 public:
+   // UDT版本号
    int32_t m_iVersion;          // UDT version
+   // UDT套接字类型
    int32_t m_iType;             // UDT socket type
+   // 起始序列号，是一个随机值
    int32_t m_iISN;              // random initial sequence number
+   // 最大报文段
    int32_t m_iMSS;              // maximum segment size
+   // 流控窗口大小
    int32_t m_iFlightFlagSize;   // flow control window size
+   // 握手过程中的请求类型
    int32_t m_iReqType;          // connection request type: 1: regular connection request, 0: rendezvous connection request, -1/-2: response
+   // UDT套接字ID
    int32_t m_iID;		// socket ID
+   // 缓存
    int32_t m_iCookie;		// cookie
+   // 对端IP地址
    uint32_t m_piPeerIP[4];	// The IP address that the peer's UDP port is bound to
 };
 
