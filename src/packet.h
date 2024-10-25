@@ -61,13 +61,13 @@ friend class CSndQueue;
 friend class CRcvQueue;
 
 public:
-   // 序列号,即m_nHeader[0]
+   // 序列号，注意：是一个引用，真实的值在m_nHeader[0]中
    int32_t& m_iSeqNo;                   // alias: sequence number
-   // ,即m_nHeader[1]
+   // UDT消息号,注意：是一个引用，真实的值在m_nHeader[1]中
    int32_t& m_iMsgNo;                   // alias: message number
-   // 时间戳，即m_nHeader[2]
+   // 时间戳，注意：是一个引用，真实的值在m_nHeader[2]中
    int32_t& m_iTimeStamp;               // alias: timestamp
-   // socket ID，即m_nHeader[3]
+   // socket ID，注意：是一个引用，真实的值在m_nHeader[3]中
    int32_t& m_iID;			// alias: socket ID
    // 负载数据，即m_PacketVector[1]中的数据
    char*& m_pcData;                     // alias: data/control information
@@ -234,7 +234,7 @@ public:
    static const int m_iContentSize;	// Size of hand shake data
 
 public:
-   // UDT版本号
+   // UDT版本号，共有四个版本
    int32_t m_iVersion;          // UDT version
    // UDT套接字类型
    int32_t m_iType;             // UDT socket type
