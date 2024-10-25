@@ -177,20 +177,23 @@ CPacket::~CPacket()
 {
 }
 
+// 获取负载数据的大小，不包含包头长度
 int CPacket::getLength() const
 {
    return m_PacketVector[1].iov_len;
 }
 
+// 设置负载数据的大小，不包含包头长度
 void CPacket::setLength(int len)
 {
    m_PacketVector[1].iov_len = len;
 }
 
+// 报文打包，根据不同类型的报文执行不同的操作
 void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 {
    // 报文类型
-   // Set (bit-0 = 1) and (bit-1~15 = type)
+   // Set (bit-0 = 1) and (bit-1~15 = type);bit[0] = 1表示是一个控制报文，bit[1:15]表示控制包的类型
    m_nHeader[0] = 0x80000000 | (pkttype << 16);
 
    // Set additional information and control information field
@@ -224,7 +227,7 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 
       break;
 
-   // 3 == 0011, NAK包，次报文说明发生了丢包
+   // 3 == 0011, NAK包，此报文说明发生了丢包
    case 3: //0011 - Loss Report (NAK)
       // loss list
       m_PacketVector[1].iov_base = (char *)rparam;
@@ -315,23 +318,27 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
    }
 }
 
+// 获取完整报文，包括包头和payload
 iovec* CPacket::getPacketVector()
 {
    return m_PacketVector;
 }
 
+// 获取报文中的flag,m_nHeader[0]的bit[0]
 int CPacket::getFlag() const
 {
    // read bit 0
    return m_nHeader[0] >> 31;
 }
 
+// 获取报文类型，ACK/ACK-2/NAK/各类控制报文
 int CPacket::getType() const
 {
    // read bit 1~15
    return (m_nHeader[0] >> 16) & 0x00007FFF;
 }
 
+// 获取报文扩展类型，m_nHeader[0]的低16位
 int CPacket::getExtendedType() const
 {
    // read bit 16~31
@@ -344,12 +351,14 @@ int32_t CPacket::getAckSeqNo() const
    return m_nHeader[1];
 }
 
+// 获取消息边界标志位，m_nHeader[1]的bit[0:1]
 int CPacket::getMsgBoundary() const
 {
    // read [1] bit 0~1
    return m_nHeader[1] >> 30;
 }
 
+// 获取消息顺序标志位，m_nHeader[1]的bit[2]
 bool CPacket::getMsgOrderFlag() const
 {
    // read [1] bit 2

@@ -109,7 +109,7 @@ public:
       // Returned value:
       //    None.
    
-   // 报文打包，根据不同类型的报文执行不同的操作
+   // 控制包打包，根据不同类型的报文执行不同的操作
    void pack(int pkttype, void* lparam = NULL, void* rparam = NULL, int size = 0);
 
       // Functionality:
@@ -129,7 +129,7 @@ public:
       // Returned value:
       //    packet flag (0 or 1).
 
-   // 获取报文中的flag,m_nHeader[0]的bit[0]
+   // 获取报文中的flag,区分是数据包还是控制包，m_nHeader[0]的bit[0]
    int getFlag() const;
 
       // Functionality:
@@ -189,7 +189,7 @@ public:
       // Returned value:
       //    packet header field [1] (bit 3~31).
 
-   // 获取消息序列号，m_nHeader[1]的bit[3:31]
+   // 获取序列号，m_nHeader[1]的bit[3:31]
    int32_t getMsgSeq() const;
 
       // Functionality:
@@ -199,7 +199,7 @@ public:
       // Returned value:
       //    Pointer to the new packet.
 
-   // 复制报文
+   // 复制报文，包含包头和负载
    CPacket* clone() const;
 
 protected:
@@ -208,6 +208,7 @@ protected:
    // m_PacketVector[0]存储包头信息；m_PacketVector[1]存储负载信息
    iovec m_PacketVector[2];             // The 2-demension vector of UDT packet [header, data]
 
+   // 数据对齐，提高内存中数据访问效率
    int32_t __pad;
 
 protected:
@@ -229,6 +230,7 @@ public:
    int deserialize(const char* buf, int size);
 
 public:
+   // 握手报文固定大小48byte
    static const int m_iContentSize;	// Size of hand shake data
 
 public:
