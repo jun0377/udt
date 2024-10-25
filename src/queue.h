@@ -372,6 +372,7 @@ private:
    CHash& operator=(const CHash&);
 };
 
+// 使用一个list来维护处于rendezvous模式的UDT实例
 class CRendezvousQueue
 {
 public:
