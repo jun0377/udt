@@ -85,7 +85,7 @@ public:
       // Returned value:
       //    Actual length of data read.
 
-   // 从发送列表中读取数据块
+   // 从发送列表中读取数据块，按块读取，每次不一定会读取一个完整的消息
    int readData(char** data, int32_t& msgno);
 
       // Functionality:
@@ -98,7 +98,7 @@ public:
       // Returned value:
       //    Actual length of data read.
 
-   // 找到数据块位置，以用于重传
+   // 按偏移量从发送缓冲区中读数据，并且丢弃超时未发送的数据
    int readData(char** data, const int offset, int32_t& msgno, int& msglen);
 
       // Functionality:
@@ -108,7 +108,7 @@ public:
       // Returned value:
       //    None.
 
-   // 更新ACK点，并根据标志释放/取消映射/返回用户数据
+   // 丢弃已被确认的数据
    void ackData(int offset);
 
       // Functionality:
@@ -133,12 +133,12 @@ private:
    {
       // 指向数据块的指针
       char* m_pcData;                   // pointer to the data block
-      // 数据块大小
+      // 数据块中有效数据的大小，有些数据可能并不会占用一个完整的数据块
       int m_iLength;                    // length of the block
 
-      // 数据标志
+      // 消息编号，用来区分是不是一个完整的消息和是否需要按序发送
       int32_t m_iMsgNo;                 // message number
-      // 数据请求时间
+      // 数据被放入发送缓冲区时的时间戳
       uint64_t m_OriginTime;            // original request time
       // 数据生存时间，ms
       int m_iTTL;                       // time to live (milliseconds)

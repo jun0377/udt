@@ -85,7 +85,7 @@ m_iCount(0)
    {
       pb->m_pcData = pc;
       pb = pb->m_pNext;
-      pc += m_iMSS;     // 指针便宜到下一个数据块
+      pc += m_iMSS;     // 指针偏移到下一个数据块
    }
 
    // 初始化数据块指针都指向申请的堆内存起始位置
@@ -140,36 +140,51 @@ void CSndBuffer::addBuffer(const char* data, int len, int ttl, bool order)
       increase();
 
    uint64_t time = CTimer::getTime();
+   // 是否需要按序发送
    int32_t inorder = order;
    inorder <<= 29;
 
+   // 指向最后一个数据块
    Block* s = m_pLastBlock;
+   // 将数据插入到数据块中
    for (int i = 0; i < size; ++ i)
    {
+      // 待插入的数据长度
       int pktlen = len - i * m_iMSS;
       if (pktlen > m_iMSS)
          pktlen = m_iMSS;
-
+      // 将数据拷贝到数据块中
       memcpy(s->m_pcData, data + i * m_iMSS, pktlen);
+      // 数据块中有效数据的大小，有些数据可能并不会占用一个完整的数据块
       s->m_iLength = pktlen;
 
+      // m_iMsgNo的bit[29]表示是否需要按序发送, m_iNextMsgNo在构造是被初始化为0
       s->m_iMsgNo = m_iNextMsgNo | inorder;
+      
+      // 下面这个逻辑用来进行data重组
+      // data起始：data占用的首个数据块, m_iMsgNo的bit[31]为1
       if (i == 0)
          s->m_iMsgNo |= 0x80000000;
+      // data结束：data占用的最后一个数据块,m_iMsgNo的bit[30]为1
       if (i == size - 1)
          s->m_iMsgNo |= 0x40000000;
 
+      // 数据被放入发送缓冲区时的时间戳
       s->m_OriginTime = time;
       s->m_iTTL = ttl;
 
+      // 下一个数据块
       s = s->m_pNext;
    }
+   // 更新最后一个数据块指针
    m_pLastBlock = s;
 
+   // 更新发送缓冲区中已被占用的数据块数量
    CGuard::enterCS(m_BufLock);
    m_iCount += size;
    CGuard::leaveCS(m_BufLock);
 
+   // 更新消息编号，超出后回绕至1
    m_iNextMsgNo ++;
    if (m_iNextMsgNo == CMsgNo::m_iMaxMsgNo)
       m_iNextMsgNo = 1;
@@ -241,22 +256,28 @@ int CSndBuffer::readData(char** data, int32_t& msgno)
    return readlen;
 }
 
+// 按偏移量从发送缓冲区中读数据，并且丢弃超时未发送地数据
 int CSndBuffer::readData(char** data, const int offset, int32_t& msgno, int& msglen)
 {
    CGuard bufferguard(m_BufLock);
 
    Block* p = m_pFirstBlock;
 
+   // 偏移，按数据块进行偏移
    for (int i = 0; i < offset; ++ i)
       p = p->m_pNext;
 
+   // 数据是否过期，如果当前时间-数据产生的时间大于数据的TTL，则认为数据过期；
+   // 删除数据并返回-1，表示读取失败
    if ((p->m_iTTL >= 0) && ((CTimer::getTime() - p->m_OriginTime) / 1000 > (uint64_t)p->m_iTTL))
    {
+      // 获取消息号
       msgno = p->m_iMsgNo & 0x1FFFFFFF;
 
       msglen = 1;
       p = p->m_pNext;
       bool move = false;
+      // 移除所有消息号相同的数据块
       while (msgno == (p->m_iMsgNo & 0x1FFFFFFF))
       {
          if (p == m_pCurrBlock)
@@ -270,6 +291,7 @@ int CSndBuffer::readData(char** data, const int offset, int32_t& msgno, int& msg
       return -1;
    }
 
+   // 正常读取数据，读一个数据块
    *data = p->m_pcData;
    int readlen = p->m_iLength;
    msgno = p->m_iMsgNo;
@@ -281,9 +303,11 @@ void CSndBuffer::ackData(int offset)
 {
    CGuard bufferguard(m_BufLock);
 
+   // 丢弃已经被对端确认的数据
    for (int i = 0; i < offset; ++ i)
       m_pFirstBlock = m_pFirstBlock->m_pNext;
 
+   // 更新发送缓冲区中已占用的数据块数量
    m_iCount -= offset;
 
    CTimer::triggerEvent();
@@ -300,6 +324,7 @@ void CSndBuffer::increase()
    int unitsize = m_pBuffer->m_iSize;
 
    // new physical buffer
+   // 申请堆空间
    Buffer* nbuf = NULL;
    try
    {

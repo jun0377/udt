@@ -189,7 +189,7 @@ void CPacket::setLength(int len)
    m_PacketVector[1].iov_len = len;
 }
 
-// 报文打包，根据不同类型的报文执行不同的操作
+// 控制报文打包，根据不同类型的报文执行不同的操作
 void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
 {
    // 报文类型
@@ -200,7 +200,7 @@ void CPacket::pack(int pkttype, void* lparam, void* rparam, int size)
    // 根据不同的报文类型，进行相应的处理
    switch (pkttype)
    {
-   // 2 == OO10, ACK包
+   // 2 == OO10, ACK包；携带RTT；RTT方差；窗口大小
    case 2: //0010 - Acknowledgement (ACK)
       // ACK packet seq. no.
       // ACK报文的序列号

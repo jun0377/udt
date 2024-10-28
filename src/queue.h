@@ -451,7 +451,7 @@ private:
    pthread_t m_WorkerThread;
 
 private:
-   // 使用一个小根堆来存储待发送的数据，堆中的节点安装时间戳进行排序
+   // 使用一个小根堆来存储待发送的数据，堆中的节点按时间戳进行排序
    CSndUList* m_pSndUList;		// List of UDT instances for data sending
    CChannel* m_pChannel;                // The UDP channel for data sending
    CTimer* m_pTimer;			// Timing facility
