@@ -84,13 +84,18 @@ CUnitQueue::~CUnitQueue()
 
 int CUnitQueue::init(int size, int mss, int version)
 {
+   // 入口
    CQEntry* tempq = NULL;
+   // 数据单元队列
    CUnit* tempu = NULL;
+   // 真正存储数据的堆空间
    char* tempb = NULL;
 
    try
    {
+      // CUnitQueue入口
       tempq = new CQEntry;
+      // CUnitQueue中的数据单元
       tempu = new CUnit [size];
       // 真正存储数据的堆空间
       tempb = new char [size * mss];
@@ -107,9 +112,9 @@ int CUnitQueue::init(int size, int mss, int version)
    // 初始化队列
    for (int i = 0; i < size; ++ i)
    {
-      // 队列中的所有节点都为空闲状态
+      // 初始化所有数据单元为空闲状态
       tempu[i].m_iFlag = 0;
-      // 队列中所有节点的指针域
+      // 初始化所有数据单元占用的堆空间地址，基地址 + 偏移量
       tempu[i].m_Packet.m_pcData = tempb + i * mss;
    }
    // 队列入口
@@ -117,16 +122,17 @@ int CUnitQueue::init(int size, int mss, int version)
    tempq->m_pBuffer = tempb;        // 真正存储数据的堆空间
    tempq->m_iSize = size;           // 队列中共有多少个节点
 
+   // 队列入口 = 当前队列 = 最后一个队列
    m_pQEntry = m_pCurrQueue = m_pLastQueue = tempq;
    // 循环队列
    m_pQEntry->m_pNext = m_pQEntry;
 
-   // 可用的数据单元
+   // 第一个可用的数据单元
    m_pAvailUnit = m_pCurrQueue->m_pUnit;
 
-   // 队列中的packet总数
+    // 队列中的数据单元总数
    m_iSize = size;
-   // 队列中每个packet的最大长度
+   // 队列中每个数据单元负载的最大长度
    m_iMSS = mss;
    // IPv4/IPv6
    m_iIPversion = version;
@@ -137,7 +143,9 @@ int CUnitQueue::init(int size, int mss, int version)
 int CUnitQueue::increase()
 {
    // adjust/correct m_iCount
+   // 统计有多少数据单元已被占用
    int real_count = 0;
+   // CUnitQueue队列入口
    CQEntry* p = m_pQEntry;
    // 遍历队列，统计处于有多少数据单元出于非空闲状态
    while (p != NULL)
@@ -146,13 +154,14 @@ int CUnitQueue::increase()
       CUnit* u = p->m_pUnit;
       // 遍历队列中的数据单元
       for (CUnit* end = u + p->m_iSize; u != end; ++ u)
-         // 统计处于有多少数据单元出于非空闲状态
+         // 统计有多少数据单元处于非空闲状态
          if (u->m_iFlag != 0)
             ++ real_count;
 
-      // 遍历到了队尾
+      // 所有队列都遍历完成
       if (p == m_pLastQueue)
          p = NULL;
+      // 当前队列统计完成，切换到下一个队列
       else
          p = p->m_pNext;
    }
@@ -167,10 +176,10 @@ int CUnitQueue::increase()
    char* tempb = NULL;
 
    // all queues have the same size
-   // 队列容量
+   // 每个数据单元队列的容量，所有的队列容量都相同，都有m_iSize个数据单元
    int size = m_pQEntry->m_iSize;
 
-   // 增加队列容量
+   // 创建一个新的数据单元队列
    try
    {
       tempq = new CQEntry;
@@ -188,17 +197,21 @@ int CUnitQueue::increase()
 
    for (int i = 0; i < size; ++ i)
    {
+      // 初始化所有数据单元为空间状态
       tempu[i].m_iFlag = 0;
+      // 初始化所有数据单元的堆空间
       tempu[i].m_Packet.m_pcData = tempb + i * m_iMSS;
    }
    tempq->m_pUnit = tempu;
    tempq->m_pBuffer = tempb;
    tempq->m_iSize = size;
 
+   // 将新建的数据单元队列纳入到CUnitQueue中
    m_pLastQueue->m_pNext = tempq;
    m_pLastQueue = tempq;
    m_pLastQueue->m_pNext = m_pQEntry;
 
+   // CUnitQueue容量
    m_iSize += size;
 
    return 0;

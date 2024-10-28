@@ -135,7 +135,7 @@ private:
 
    // 队列中的packet总数
    int m_iSize;			// total size of the unit queue, in number of packets
-   // 已分配的数据单元统计
+   // 有多少数据单元处于非空闲状态
    int m_iCount;		// total number of valid packets in the queue
 
    // // 队列中每个packet的最大长度
