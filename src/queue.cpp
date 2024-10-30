@@ -238,12 +238,12 @@ CUnit* CUnitQueue::getNextAvailUnit()
 
    do
    {
-      // 从m_pAvailUnit开始，遍历队列，找到一个未使用的数据单元
+      // 从m_pAvailUnit开始，遍历队列，找到一个空闲的数据单元
       for (CUnit* sentinel = m_pCurrQueue->m_pUnit + m_pCurrQueue->m_iSize - 1; m_pAvailUnit != sentinel; ++ m_pAvailUnit)
          if (m_pAvailUnit->m_iFlag == 0)
             return m_pAvailUnit;
 
-      // 检查当前队列的第一个数据单元是否可用, why ???
+      // 检查当前队列的第一个数据单元是否可用
       if (m_pCurrQueue->m_pUnit->m_iFlag == 0)
       {
          m_pAvailUnit = m_pCurrQueue->m_pUnit;

@@ -308,7 +308,7 @@ private:
    CRcvBuffer();
    // 仅声明未实现，相当于禁用了拷贝赋值操作
    CRcvBuffer(const CRcvBuffer&);
-   // 仅声明未实现，相当于仅用了赋值操作
+   // 仅声明未实现，相当于禁用了赋值操作
    CRcvBuffer& operator=(const CRcvBuffer&);
 };
 

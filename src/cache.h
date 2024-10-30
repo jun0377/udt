@@ -47,15 +47,19 @@ written by
 #include "common.h"
 #include "udt.h"
 
+// 抽象类，用来表示缓存项
 class CCacheItem
 {
 public:
+   // 虚析构
    virtual ~CCacheItem() {}
 
 public:
+   // 纯虚函数，用来实现赋值操作
    virtual CCacheItem& operator=(const CCacheItem&) = 0;
 
    // The "==" operator SHOULD only compare key values.
+   // 重载 "==" 运算符
    virtual bool operator==(const CCacheItem&) = 0;
 
       // Functionality:
@@ -65,6 +69,7 @@ public:
       // Returned value:
       //    Pointer to the new item, or NULL if failed.
 
+   // 深拷贝克隆数据
    virtual CCacheItem* clone() = 0;
 
       // Functionality:
@@ -74,13 +79,18 @@ public:
       // Returned value:
       //    A random hash key.
 
+   // 缓存hash数据结构中的key
    virtual int getKey() = 0;
 
    // If there is any shared resources between the cache item and its clone,
    // the shared resource should be released by this function.
+   // 如果缓存项与其克隆之间存在任何共享资源，则共享的资源应该被这个函数释放
    virtual void release() {}
 };
 
+// 缓存模板类，用于存储和管理缓存项
+// 使用了LRU策略,即最近最少使用:主要用于管理缓存中的数据。
+// LRU基本思想是：如果一个数据在最近被使用过，那么它在将来被使用的概率也较高；反之，如果一个数据在很长时间内没有被使用过，那么它在将来被使用的概率较低
 template<typename T> class CCache
 {
 public:
@@ -89,6 +99,7 @@ public:
    m_iHashSize(size * 3),
    m_iCurrSize(0)
    {
+      // 哈希表的大小为缓存项个数的三倍，以减少hash冲突
       m_vHashPtr.resize(m_iHashSize);
       // 初始化锁
       CGuard::createMutex(m_Lock);
@@ -96,6 +107,7 @@ public:
 
    ~CCache()
    {
+      // 释放所有缓存项及哈希表
       clear();
       // 销毁锁
       CGuard::releaseMutex(m_Lock);
@@ -112,23 +124,26 @@ public:
    // 从缓存中查找匹配项，拷贝数据到data中
    int lookup(T* data)
    {
-      // 类似C++11中的lock_guard
+      // lock_guard
       CGuard cacheguard(m_Lock);
 
-      // 获取key值
+      // 获取key值,要求模板参数T必须实现getKey()函数
       int key = data->getKey();
       if (key < 0)
          return -1;
+      // 避免key值超出哈希表的大小
       if (key >= m_iMaxSize)
          key %= m_iHashSize;
 
-      // 找到匹配的list,list中存储的是迭代器
+      // 哈希查找，找到匹配的list
       const ItemPtrList& item_list = m_vHashPtr[key];
       for (typename ItemPtrList::const_iterator i = item_list.begin(); i != item_list.end(); ++ i)
       {
+         // 虽然*data == ***i，但是并不意味者这两个对象完全相同，要看==运算符重载是如何实现的
          if (*data == ***i)
          {
             // copy the cached info
+            // 将整个对象进行拷贝
             *data = ***i;
             return 0;
          }
@@ -147,35 +162,43 @@ public:
    // 更新缓存中的项，或者插入一个不存在的项；最旧的项目可能会被删除
    int update(T* data)
    {
-      // 类似C++11中的lock_guard
+      // RAII方式加锁，函数结束时自动解锁
       CGuard cacheguard(m_Lock);
 
-      // 获取key值
+      // 获取key值，要求模板参数中必须实现了getKey()函数
       int key = data->getKey();
       if (key < 0)
          return -1;
+      // 避免key值超出哈希表的大小
       if (key >= m_iMaxSize)
          key %= m_iHashSize;
 
+      // 用于临时存储当前正在处理的项
       T* curr = NULL;
 
-      // 找到匹配的list,list中存储的是迭代器
+      // 查找现有项，获取key对应的list
       ItemPtrList& item_list = m_vHashPtr[key];
       for (typename ItemPtrList::iterator i = item_list.begin(); i != item_list.end(); ++ i)
       {
-         // 如果key对应的数据已存在，则删除之，并将新数据插入到最前面
+         // 如果key对应的数据已存在，则删除之，并将新数据插入到最前面，LRU策略
          if (*data == ***i)
          {
             // update the existing entry with the new value
+            // 更新数据内容
             ***i = *data;
+            // 保存数据
             curr = **i;
 
             // remove the current entry
+            // 从原位置删除数据
             m_StorageList.erase(*i);
+            // 从哈希表中删除数据
             item_list.erase(i);
 
             // re-insert to the front
+            // 将数据重新插入到链表的最前面(LRU策略)
             m_StorageList.push_front(curr);
+            // 更新哈希表中的引用
             item_list.push_front(m_StorageList.begin());
 
             return 0;
@@ -183,18 +206,22 @@ public:
       }
 
       // create new entry and insert to front
+      // 如果是新的缓存项，创建并插入到链表的最前面
       curr = data->clone();
       m_StorageList.push_front(curr);
+      // 更新哈希表中的引用
       item_list.push_front(m_StorageList.begin());
 
+      // 更新缓存项个数
       ++ m_iCurrSize;
-      // 缓冲容量超出限制，则删除旧的数据
+      // 缓冲容量超出限制，则删除最旧的数据
       if (m_iCurrSize >= m_iMaxSize)
       {
          // Cache overflow, remove oldest entry.
+         // 缓存溢出，删除最旧的数据
          T* last_data = m_StorageList.back();
          int last_key = last_data->getKey() % m_iHashSize;
-
+         // 从哈希表中删除
          item_list = m_vHashPtr[last_key];
          for (typename ItemPtrList::iterator i = item_list.begin(); i != item_list.end(); ++ i)
          {
@@ -204,10 +231,12 @@ public:
                break;
             }
          }
-
+         // 删除数据，释放内存
          last_data->release();
          delete last_data;
+         // 删除链表中的数据
          m_StorageList.pop_back();
+         // 更新缓存项个数
          -- m_iCurrSize;
       }
 
@@ -221,11 +250,14 @@ public:
       // Returned value:
       //    None.
 
-   // 指定缓存大小（即，最大条目数）
+   // 指定缓存大小
    void setSizeLimit(int size)
    {
+      // 缓存项个数
       m_iMaxSize = size;
+      // 哈希表的大小为缓存项个数的三倍，以减少hash冲突
       m_iHashSize = size * 3;
+      // 重新调整哈希表的大小
       m_vHashPtr.resize(m_iHashSize);
    }
 
@@ -239,39 +271,43 @@ public:
    // 清除缓存中的所有条目，恢复到初始化状态
    void clear()
    {
+      // 释放所有缓存项
       for (typename std::list<T*>::iterator i = m_StorageList.begin(); i != m_StorageList.end(); ++ i)
       {
          (*i)->release();
          delete *i;
       }
+      // 清除真正存储缓存项的链表
       m_StorageList.clear();
+      // 清除哈希表
       for (typename std::vector<ItemPtrList>::iterator i = m_vHashPtr.begin(); i != m_vHashPtr.end(); ++ i)
          i->clear();
+
+      // 更新缓存项个数
       m_iCurrSize = 0;
    }
 
 private:
-   // 存储指针的链表
+   // 真正存储缓存项的链表
    std::list<T*> m_StorageList;
-   // 声明一个新的类型ItemPtr，它是一个指向m_StorageList中的某一个节点的迭代器
    typedef typename std::list<T*>::iterator ItemPtr;
-   // 生命一个新的类型ItemPtrList，它是一个链表，存储着链表迭代器
    typedef std::list<ItemPtr> ItemPtrList;
-   // 存储着m_StorageList中每个节点的入口entry
+   // 哈希表中存放的是每个list的入口地址，用于快速找到对应的list
    std::vector<ItemPtrList> m_vHashPtr;
 
    // 缓存最大大小
    int m_iMaxSize;
-   // 哈希表，为什么要是m_iMaxSize的三倍？
+   // 哈希表，是m_iMaxSize的三倍，以减少哈希冲突的概率
    int m_iHashSize;
+   // 缓存的最大大小
    int m_iCurrSize;
 
    pthread_mutex_t m_Lock;
 
 private:
-   // 重载拷贝构造函数
+   // 仅声明未实现，表示禁用拷贝构造函数
    CCache(const CCache&);
-   // 重载赋值运算符 
+   // 仅声明未实现，表示禁用拷贝赋值
    CCache& operator=(const CCache&);
 };
 
