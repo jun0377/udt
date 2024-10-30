@@ -327,19 +327,24 @@ public:
    int m_iBandwidth;		// estimated bandwidth
    // 平均丢包率
    int m_iLossRate;		// average loss rate
-   // 重排序距离？什么意思？
+   // 重排序距离，数据包到达顺序与发送顺序的差异，可以用来识别网络中的重排序现象
    int m_iReorderDistance;	// packet reordering distance
-   // 包间时间，拥塞控制
+   // 包间时间，数据包之间的时间间隔，用于拥塞控制
    double m_dInterval;		// inter-packet time, congestion control
    // 拥塞控制窗口大小
    double m_dCWnd;		// congestion window size, congestion control
 
 public:
    virtual ~CInfoBlock() {}
+   // 重载赋值运算符
    virtual CInfoBlock& operator=(const CInfoBlock& obj);
+   // 重载==运算符
    virtual bool operator==(const CInfoBlock& obj);
+   // 深拷贝克隆
    virtual CInfoBlock* clone();
+   // 获取key值，以IP地址作为key值
    virtual int getKey();
+   // 释放资源，未实现
    virtual void release() {}
 
 public:
@@ -353,7 +358,7 @@ public:
       // Returned value:
       //    None.
 
-   // 将sockaddr类型转换为整数数组
+   // 将sockaddr类型转换为机器可读的IP地址格式
    static void convert(const sockaddr* addr, int ver, uint32_t ip[]);
 };
 
