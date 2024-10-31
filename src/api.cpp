@@ -527,7 +527,7 @@ int CUDTUnited::bind(const UDTSOCKET u, const sockaddr* name, int namelen)
    CGuard cg(s->m_ControlLock);
 
    // cannot bind a socket more than once
-   // 状态机：只有处于INIT状态的socket才可以绑定
+   // 只有处于INIT状态的socket才可以绑定，避免一个UDT套接字被多次绑定
    if (INIT != s->m_Status)
       throw CUDTException(5, 0, 0);
 
@@ -656,7 +656,7 @@ int CUDTUnited::listen(const UDTSOCKET u, int backlog)
       throw CUDTException(3, 2, 0);
    }
 
-   // 设置一个标志位，表示处于listem模式
+   // 设置一个标志位，表示处于listen模式
    s->m_pUDT->listen();
 
    // 进入下一状态LISTENING
@@ -730,7 +730,7 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
             pthread_cond_wait(&(ls->m_AcceptCond), &(ls->m_AcceptLock));
          }
 
-         // 待处理的套接字队列为空，将监听套接字从epoll中移除
+         // 待处理的套接字队列为空，将监听套接字从epoll中移除，减少资源占用
          if (ls->m_pQueuedSockets->empty())
             m_EPoll.update_events(listen, ls->m_pUDT->m_sPollID, UDT_EPOLL_IN, false);
 
@@ -773,7 +773,7 @@ UDTSOCKET CUDTUnited::accept(const UDTSOCKET listen, sockaddr* addr, int* addrle
    if (u == CUDT::INVALID_SOCK)
    {
       // non-blocking receiving, no connection available
-      // 非阻塞接受，没有可以的连接
+      // 非阻塞接收，没有可用的连接
       if (!ls->m_pUDT->m_bSynRecving)
          throw CUDTException(6, 2, 0);
 

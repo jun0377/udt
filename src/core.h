@@ -200,6 +200,7 @@ private:
       // Returned value:
       //    Actual size of data sent.
 
+   // 将数据放入发送缓冲区
    int send(const char* data, int len);
 
       // Functionality:
@@ -210,6 +211,7 @@ private:
       // Returned value:
       //    Actual size of data received.
 
+   // 从接收缓冲区中读数据
    int recv(char* data, int len);
 
       // Functionality:
@@ -222,6 +224,7 @@ private:
       // Returned value:
       //    Actual size of data sent.
 
+   // 将数据放入发送缓冲区，相较于send,允许设置消息的生存时间和是否顺序发送
    int sendmsg(const char* data, int len, int ttl, bool inorder);
 
       // Functionality:
@@ -232,6 +235,7 @@ private:
       // Returned value:
       //    Actual size of data received.
 
+   // 从接收缓冲区中读取数据
    int recvmsg(char* data, int len);
 
       // Functionality:
@@ -244,6 +248,7 @@ private:
       // Returned value:
       //    Actual size of data sent.
 
+   // 发送文件，按块发送
    int64_t sendfile(std::fstream& ifs, int64_t& offset, int64_t size, int block = 366000);
 
       // Functionality:
@@ -256,6 +261,7 @@ private:
       // Returned value:
       //    Actual size of data received.
 
+   // 接收文件
    int64_t recvfile(std::fstream& ofs, int64_t& offset, int64_t size, int block = 7320000);
 
       // Functionality:
@@ -267,6 +273,7 @@ private:
       // Returned value:
       //    None.
 
+   // 设置套接字参数
    void setOpt(UDTOpt optName, const void* optval, int optlen);
 
       // Functionality:
@@ -278,6 +285,7 @@ private:
       // Returned value:
       //    None.
 
+   // 获取套接字参数
    void getOpt(UDTOpt optName, void* optval, int& optlen);
 
       // Functionality:
@@ -288,7 +296,7 @@ private:
       // Returned value:
       //    None.
 
-   // 传输状态数据
+   // 传输状态，性能监测
    void sample(CPerfMon* perf, bool clear = true);
 
 private:
@@ -336,9 +344,11 @@ private: // Options
    int64_t m_llMaxBW;				// maximum data transfer rate (threshold)
 
 private: // congestion control
-   // 拥塞控制工程模式
+   // 拥塞控制工厂类
    CCCVirtualFactory* m_pCCFactory;             // Factory class to create a specific CC instance
+   // 拥塞控制类
    CCC* m_pCC;                                  // congestion control class
+   // 网络状态缓存
    CCache<CInfoBlock>* m_pCache;		// network information cache
 
 private: // Status

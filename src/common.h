@@ -244,7 +244,7 @@ private:
 // decseq: decrease the seq# by 1
 // incseq: increase the seq# by a given offset
 
-// UDT包的序列号
+// UDT包的序列号，实现序列号的增加/减少/比较/偏移量计算等功能
 class CSeqNo
 {
 public:
@@ -304,7 +304,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 // UDT Message Number: 0 - (2^29 - 1)
-
+// UDT消息号，实现UDT消息号的比较/长度计算/偏移量计算等功能
 class CMsgNo
 {
 public:
@@ -335,6 +335,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// 实现IP地址的比较/二进制网络地址和字符串转换的功能功能
 struct CIPAddress
 {
    static bool ipcmp(const sockaddr* addr1, const sockaddr* addr2, int ver = AF_INET);
@@ -344,6 +345,7 @@ struct CIPAddress
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// MD5计算
 struct CMD5
 {
    static void compute(const char* input, unsigned char result[16]);

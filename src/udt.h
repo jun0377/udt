@@ -130,12 +130,19 @@ enum UDTSTATUS {
    INIT = 1,
    // UDP套接字已建立
    OPENED, 
-   LISTENING, 
-   CONNECTING, 
-   CONNECTED, 
+   // 正在建立连接
+   LISTENING,
+   // 连接中 
+   CONNECTING,
+   // 连接成功 
+   CONNECTED,
+   // 连接异常
    BROKEN, 
-   CLOSING, 
+   // 正在关闭连接
+   CLOSING,
+   // 连接已关闭
    CLOSED, 
+   // 异常状态
    NONEXIST
    };
 

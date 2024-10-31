@@ -284,6 +284,7 @@ public:
 };
 
 // UDT拥塞控制类
+// 根据接收端的接收速率来控制发送端发送间隔，保证发送端永远不会发送超出接收端接收能力的数据
 class CUDTCC: public CCC
 {
 public:
