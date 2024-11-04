@@ -467,6 +467,7 @@ private:
    CSndQueue& operator=(const CSndQueue&);
 };
 
+// 管理接收数据包的队列，用于处理数据接收
 class CRcvQueue
 {
 friend class CUDT;
@@ -490,7 +491,7 @@ public:
       // Returned value:
       //    None.
 
-   // 初始化接收队列
+   // 初始化接收队列的大小、负载大小、IP版本、哈希表大小、UDP通道、定时器
    void init(int size, int payload, int version, int hsize, CChannel* c, CTimer* t);
 
       // Functionality:
@@ -512,16 +513,16 @@ private:
    static DWORD WINAPI worker(LPVOID param);
 #endif
 
-   // 用于处理数据接收的工作线程ID
+   // 用于处理数据接收的工作线程
    pthread_t m_WorkerThread;
 
 private:
    // 存储接收到数据包的队列
    CUnitQueue m_UnitQueue;		// The received packet queue
 
-   // UDT实例列表
+   // UDT实例列表，将从这些UDT实例中读取数据包
    CRcvUList* m_pRcvUList;		// List of UDT instances that will read packets from the queue
-   // 用于查找UDT套接字
+   // 哈希表，用于查找UDT套接字
    CHash* m_pHash;			// Hash table for UDT socket looking up
    // 关联的UDP通道
    CChannel* m_pChannel;		// UDP channel for receving packets
@@ -533,6 +534,7 @@ private:
 
    // 工作线程是否正在关闭
    volatile bool m_bClosing;            // closing the workder
+   // 工作线程退出的条件变量
    pthread_cond_t m_ExitCond;
 
 private:
@@ -557,7 +559,7 @@ private:
    pthread_mutex_t m_LSLock;
    // 指向监听的UDT实例
    CUDT* m_pListener;                                   // pointer to the (unique, if any) listening UDT entity
-   // 管理交汇连接模式的队列，P2P模式
+   // 管理交汇连接模式的队列
    CRendezvousQueue* m_pRendezvousQueue;                // The list of sockets in rendezvous mode
 
    // 存储新的UDT实例
@@ -566,9 +568,11 @@ private:
 
    std::map<int32_t, std::queue<CPacket*> > m_mBuffer;	// temporary buffer for rendezvous connection request
    pthread_mutex_t m_PassLock;
+   // 用于在没有数据包时等待
    pthread_cond_t m_PassCond;
 
 private:
+   // 禁用拷贝构造函数和赋值运算符
    CRcvQueue(const CRcvQueue&);
    CRcvQueue& operator=(const CRcvQueue&);
 };

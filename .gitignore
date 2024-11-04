@@ -10,4 +10,5 @@ UDT.sln
 UDT.vcxproj.filters
 UDT.vcxproj.user
 x64
-
+.vscode/
+.vscode/settings.json

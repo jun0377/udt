@@ -955,7 +955,6 @@ void CRendezvousQueue::updateConnStatus()
    }
 }
 
-//
 CRcvQueue::CRcvQueue():
 m_WorkerThread(),
 m_UnitQueue(),

@@ -2556,6 +2556,8 @@ int CUDT::processData(CUnit* unit)
 
 int CUDT::listen(sockaddr* addr, CPacket& packet)
 {
+   std::cout << "========= CUDT::listen() ======== " << std::endl;
+
    if (m_bClosing)
       return 1002;
 
