@@ -396,6 +396,7 @@ m_iCookie(0)
       m_piPeerIP[i] = 0;
 }
 
+// 握手报文封包
 int CHandShake::serialize(char* buf, int& size)
 {
    if (size < m_iContentSize)

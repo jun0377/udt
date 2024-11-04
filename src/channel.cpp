@@ -125,7 +125,7 @@ void CChannel::open(const sockaddr* addr)
       hints.ai_family = m_iIPversion;
       hints.ai_socktype = SOCK_DGRAM;
 
-      // 自动选择一个未使用的端口进行绑定
+      // 绑定到一个动态分配的端口上
       if (0 != ::getaddrinfo(NULL, "0", &hints, &res))
          throw CUDTException(1, 3, NET_ERROR);
 
@@ -139,6 +139,7 @@ void CChannel::open(const sockaddr* addr)
    setUDPSockOpt();
 }
 
+// 复用一个已建立的UDP连接
 void CChannel::open(UDPSOCKET udpsock)
 {
    m_iSocket = udpsock;
@@ -191,6 +192,7 @@ void CChannel::setUDPSockOpt()
    #endif
 }
 
+// 直接调用系统API close()，关闭UDP套接字
 void CChannel::close() const
 {
    #ifndef WIN32
@@ -200,6 +202,7 @@ void CChannel::close() const
    #endif
 }
 
+// 调用系统API getsockopt，获取内核发送缓冲区大小
 int CChannel::getSndBufSize()
 {
    socklen_t size = sizeof(socklen_t);
@@ -207,6 +210,7 @@ int CChannel::getSndBufSize()
    return m_iSndBufSize;
 }
 
+// 调用系统API getsockopt，获取内核接收缓冲区大小
 int CChannel::getRcvBufSize()
 {
    socklen_t size = sizeof(socklen_t);
@@ -214,23 +218,26 @@ int CChannel::getRcvBufSize()
    return m_iRcvBufSize;
 }
 
+// 调用系统API setsockopt，设置内核发送缓冲区大小
 void CChannel::setSndBufSize(int size)
 {
    m_iSndBufSize = size;
 }
 
+// 调用系统API setsockopt，设置内核接收缓冲区大小
 void CChannel::setRcvBufSize(int size)
 {
    m_iRcvBufSize = size;
 }
 
+// 调用系统API getsockname，获取本地地址
 void CChannel::getSockAddr(sockaddr* addr) const
 {
    socklen_t namelen = m_iSockAddrSize;
-   // 调用系统API
    ::getsockname(m_iSocket, addr, &namelen);
 }
 
+// 调用系统API getsockname，获取对端地址
 void CChannel::getPeerAddr(sockaddr* addr) const
 {
    socklen_t namelen = m_iSockAddrSize;
@@ -240,15 +247,18 @@ void CChannel::getPeerAddr(sockaddr* addr) const
 int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
 {
    // convert control information into network order
-   // 将包头的控制信息转换成网络字节序
-   if (packet.getFlag())
-      for (int i = 0, n = packet.getLength() / 4; i < n; ++ i)
+   // packet.getFlag() ！=0,说明是一个控制报文
+   // 将控制报文转换成网络字节序
+   // 判断是否是一个控制报文，如果是一个控制报文，将其转换成网络字节序
+   if (packet.getFlag()){
+      for (int i = 0, n = packet.getLength() / 4; i < n; ++ i){
          *((uint32_t *)packet.m_pcData + i) = htonl(*((uint32_t *)packet.m_pcData + i));
-
+      }
+   }
    // convert packet header into network order
    //for (int j = 0; j < 4; ++ j)
    //   packet.m_nHeader[j] = htonl(packet.m_nHeader[j]);
-   // 将包头转换成网络字节序
+   // 将所有报文的包头转换成网络字节序
    uint32_t* p = packet.m_nHeader;
    for (int j = 0; j < 4; ++ j)
    {
@@ -278,7 +288,7 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
    // convert back into local host order
    //for (int k = 0; k < 4; ++ k)
    //   packet.m_nHeader[k] = ntohl(packet.m_nHeader[k]);
-   // 重新将包头转换成本地字节序
+   // 由于传入的参数packet是引用，所以这里需要重新转换成本地字节序，避免破环引用的数据
    p = packet.m_nHeader;
    for (int k = 0; k < 4; ++ k)
    {
@@ -315,6 +325,7 @@ int CChannel::recvfrom(sockaddr* addr, CPacket& packet) const
          FD_SET(m_iSocket, &set);
          tv.tv_sec = 0;
          tv.tv_usec = 10000;
+         // 只是用来设置超时时间，等待套接字可读
          ::select(m_iSocket+1, &set, NULL, &set, &tv);
       #endif
       

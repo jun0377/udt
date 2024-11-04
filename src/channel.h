@@ -60,7 +60,7 @@ public:
       // Returned value:
       //    None.
 
-   // 调用系统API socket/bind
+   // 调用系统API socket/bind，新建一个UDP连接，必须进行地址绑定
    void open(const sockaddr* addr = NULL);
 
       // Functionality:
@@ -70,7 +70,7 @@ public:
       // Returned value:
       //    None.
 
-   // 使用已创建的sockfd
+   // 复用一个已建立的UDP连接
    void open(UDPSOCKET udpsock);
 
       // Functionality:
@@ -80,7 +80,7 @@ public:
       // Returned value:
       //    None.
 
-   // 调用系统API close
+   // 直接调用系统API，关闭UDP套接字
    void close() const;
 
       // Functionality:
@@ -90,7 +90,7 @@ public:
       // Returned value:
       //    Current UDP sending buffer size.
 
-   // 调用系统API getsockopt，获取发送缓冲区大小
+   // 调用系统API getsockopt，获取内核发送缓冲区大小
    int getSndBufSize();
 
       // Functionality:
@@ -100,7 +100,7 @@ public:
       // Returned value:
       //    Current UDP receiving buffer size.
 
-   //  调用系统API getsockopt，获取接收缓冲区大小
+   //  调用系统API getsockopt，获取内核接收缓冲区大小
    int getRcvBufSize();
 
       // Functionality:
@@ -110,7 +110,7 @@ public:
       // Returned value:
       //    None.
 
-   // 设置发送缓冲区大小
+   // 调用系统API setsockopt，设置内核发送缓冲区大小
    void setSndBufSize(int size);
 
       // Functionality:
@@ -120,7 +120,7 @@ public:
       // Returned value:
       //    None.
 
-   // 设置接收缓冲区大小
+   // 调用系统API setsockopt，设置内核接收缓冲区大小
    void setRcvBufSize(int size);
 
       // Functionality:
@@ -161,7 +161,7 @@ public:
       // Returned value:
       //    Actual size of data received.
 
-   // 调用系统API recvmsg, 接收数据
+   // 调用系统API recvmsg, 接收数据，超时时间10ms
    int recvfrom(sockaddr* addr, CPacket& packet) const;
 
 private:
@@ -177,9 +177,9 @@ private:
    // UDP系统套接字
    UDPSOCKET m_iSocket;                 // socket descriptor
 
-   // 发送缓冲区大小，默认为65536
+   // 内核发送缓冲区大小，默认为65536
    int m_iSndBufSize;                   // UDP sending buffer size
-   // 接收缓冲区大小，默认为65536
+   // 内核接收缓冲区大小，默认为65536
    int m_iRcvBufSize;                   // UDP receiving buffer size
 };
 

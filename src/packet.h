@@ -244,7 +244,7 @@ public:
    int32_t m_iMSS;              // maximum segment size
    // 流控窗口大小
    int32_t m_iFlightFlagSize;   // flow control window size
-   // 握手过程中的请求类型
+   // 握手过程中的请求类型，1：普通连接请求，0：交会连接请求，-1/-2：响应
    int32_t m_iReqType;          // connection request type: 1: regular connection request, 0: rendezvous connection request, -1/-2: response
    // UDT套接字ID
    int32_t m_iID;		// socket ID

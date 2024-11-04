@@ -316,6 +316,7 @@ private: // Identification
 private: // Packet sizes
    // 默认是: 最大报文段　- (20bytes的IP头+8bytes的UDP头)
    int m_iPktSize;                              // Maximum/regular packet size, in bytes
+   // 负载数据大小，不包含包头
    int m_iPayloadSize;                          // Maximum/regular payload size, in bytes
 
 private: // Options
@@ -381,9 +382,11 @@ private: // Status
    // 在关闭一个仍有未发送数据的sockfd时，等待的时间
    uint64_t m_ullLingerExpiration;		// Linger expiration time (for GC to close a socket with data in sending buffer)
 
+   // 主动建立连接的握手报文
    CHandShake m_ConnReq;			// connection request
+   // 对端返回的握手报文
    CHandShake m_ConnRes;			// connection response
-   // 最后一次发送连接请求的时间
+   // 用于控制连接请求的发送间隔，避免频繁发送，每250ms最多发送1个请求
    int64_t m_llLastReqTime;			// last time when a connection request is sent
 
 private: // Sending related data

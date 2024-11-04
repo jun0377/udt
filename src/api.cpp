@@ -822,11 +822,12 @@ int CUDTUnited::connect(const UDTSOCKET u, const sockaddr* name, int namelen)
    }
 
    // a socket can "connect" only if it is in INIT or OPENED status
-   // 状态切换 INIT->OPENED->CONNECTING
+   // 状态切换 INIT->OPENED->CONNECTING，只有处于INIT状态的socket才可以调用open()
    if (INIT == s->m_Status)
    {
       if (!s->m_pUDT->m_bRendezvous)
       {
+         // 核心逻辑，open一个UDT连接
          s->m_pUDT->open();
          updateMux(s);
          s->m_Status = OPENED;
@@ -844,7 +845,7 @@ int CUDTUnited::connect(const UDTSOCKET u, const sockaddr* name, int namelen)
    s->m_Status = CONNECTING;
    try
    {
-      // connect
+      // 核心逻辑，开始建立连接
       s->m_pUDT->connect(name);
    }
    catch (CUDTException e)
@@ -853,7 +854,7 @@ int CUDTUnited::connect(const UDTSOCKET u, const sockaddr* name, int namelen)
       throw e;
    }
 
-   // record peer address
+   // 记录对端IP地址
    delete s->m_pPeerAddr;
    if (AF_INET == s->m_iIPversion)
    {

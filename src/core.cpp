@@ -625,6 +625,7 @@ void CUDT::connect(const sockaddr* serv_addr)
    m_pRcvQueue->registerConnector(m_SocketID, this, m_iIPversion, serv_addr, ttl);
 
    // This is my current configurations
+   // 记录当前配置
    m_ConnReq.m_iVersion = m_iVersion;
    m_ConnReq.m_iType = m_iSockType;
    m_ConnReq.m_iMSS = m_iMSS;
@@ -645,21 +646,29 @@ void CUDT::connect(const sockaddr* serv_addr)
    m_ullSndLastAck2Time = CTimer::getTime();
 
    // Inform the server my configurations.
+   // 握手报文: 告知对端我的配置
    CPacket request;
    char* reqdata = new char [m_iPayloadSize];
+   // 0表示是一个握手报文
    request.pack(0, NULL, reqdata, m_iPayloadSize);
    // ID = 0, connection request
    request.m_iID = 0;
 
+   // 握手报文负载数据大小
    int hs_size = m_iPayloadSize;
+   // 握手报文封包
    m_ConnReq.serialize(reqdata, hs_size);
    request.setLength(hs_size);
+   // 调用系统API sendmsg()立即发送
    m_pSndQueue->sendto(serv_addr, request);
+   // 记录最后一次发送连接请求的时间，用于控制连接请求的发送间隔，每250ms最多发送1个请求
    m_llLastReqTime = CTimer::getTime();
 
+   // 正在建立连接标志位
    m_bConnecting = true;
 
    // asynchronous connect, return immediately
+   // 异步连接，不必阻塞等待，立即返回
    if (!m_bSynRecving)
    {
       delete [] reqdata;
@@ -667,6 +676,7 @@ void CUDT::connect(const sockaddr* serv_addr)
    }
 
    // Wait for the negotiated configurations from the peer side.
+   // 等待对端返回协商的配置
    CPacket response;
    char* resdata = new char [m_iPayloadSize];
    response.pack(0, NULL, resdata, m_iPayloadSize);
@@ -676,17 +686,22 @@ void CUDT::connect(const sockaddr* serv_addr)
    while (!m_bClosing)
    {
       // avoid sending too many requests, at most 1 request per 250ms
+      // 避免发送太多请求，每250ms最多发送1个请求
       if (CTimer::getTime() - m_llLastReqTime > 250000)
       {
+         // 握手报文封包
          m_ConnReq.serialize(reqdata, hs_size);
          request.setLength(hs_size);
          if (m_bRendezvous)
             request.m_iID = m_ConnRes.m_iID;
+
+         // 调用系统API sendmsg()立即发送
          m_pSndQueue->sendto(serv_addr, request);
          m_llLastReqTime = CTimer::getTime();
       }
 
       response.setLength(m_iPayloadSize);
+      // 对端返回的握手报文
       if (m_pRcvQueue->recvfrom(m_SocketID, response) > 0)
       {
          if (connect(response) <= 0)
@@ -696,6 +711,7 @@ void CUDT::connect(const sockaddr* serv_addr)
          m_llLastReqTime = 0;
       }
 
+      // 连接超时
       if (CTimer::getTime() > ttl)
       {
          // timeout
@@ -721,6 +737,9 @@ void CUDT::connect(const sockaddr* serv_addr)
       throw e;
 }
 
+// 如果连接建立成功，则返回0。
+//返回-1表示有错误。
+//返回1或2表示连接正在进行中，需要更多的握手
 int CUDT::connect(const CPacket& response) throw ()
 {
    // this is the 2nd half of a connection request. If the connection is setup successfully this returns 0.
@@ -740,12 +759,15 @@ int CUDT::connect(const CPacket& response) throw ()
    if ((1 != response.getFlag()) || (0 != response.getType()))
       return -1;
 
+   // 对端返回的握手报文解包
    m_ConnRes.deserialize(response.m_pcData, response.getLength());
 
    if (m_bRendezvous)
    {
       // regular connect should NOT communicate with rendezvous connect
       // rendezvous connect require 3-way handshake
+      // 常规连接不应该与会合连接通信
+      // 会合连接需要3次握手
       if (1 == m_ConnRes.m_iReqType)
          return -1;
 
@@ -760,6 +782,7 @@ int CUDT::connect(const CPacket& response) throw ()
    else
    {
       // set cookie
+      // 普通连接
       if (1 == m_ConnRes.m_iReqType)
       {
          m_ConnReq.m_iReqType = -1;
@@ -786,6 +809,7 @@ POST_CONNECT:
    memcpy(m_piSelfIP, m_ConnRes.m_piPeerIP, 16);
 
    // Prepare all data structures
+   // 准备所有数据结构
    try
    {
       m_pSndBuffer = new CSndBuffer(32, m_iPayloadSize);
@@ -2556,8 +2580,6 @@ int CUDT::processData(CUnit* unit)
 
 int CUDT::listen(sockaddr* addr, CPacket& packet)
 {
-   std::cout << "========= CUDT::listen() ======== " << std::endl;
-
    if (m_bClosing)
       return 1002;
 
