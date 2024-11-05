@@ -398,6 +398,7 @@ private: // Sending related data
    CPktTimeWindow* m_pSndTimeWindow;            // Packet sending time window
 
    volatile uint64_t m_ullInterval;             // Inter-packet time, in CPU clock cycles
+   // 当前时间与计划发送时间的差值，用于在发送数据时进行时间调度，确保数据在适当的时间发送
    uint64_t m_ullTimeDiff;                      // aggregate difference in inter-packet time
 
    volatile int m_iFlowWindowSize;              // Flow control window size
@@ -525,7 +526,7 @@ private: // Timers
    int m_iPktCount;				// packet counter for ACK
    int m_iLightACKCount;			// light ACK counter
 
-   // 计划发送下一个包的时间
+   // 下一个数据包的调度时间
    uint64_t m_ullTargetTime;			// scheduled time of next packet sending
 
    void checkTimers();

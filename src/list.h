@@ -46,7 +46,7 @@ written by
 #include "common.h"
 
 
-// 传输中丢的包，用于重传
+// 重传列表，记录传输中丢的包，用于重传
 // 使用两个list来保存丢包的起始序列号和终止序列号
 class CSndLossList
 {
@@ -72,7 +72,7 @@ public:
       // Returned value:
       //    None.
    
-   // 删除所有小于seqno的序列号
+   // 删除所有小于等于seqno的序列号
    void remove(int32_t seqno);
 
       // Functionality:
@@ -96,14 +96,14 @@ public:
    int32_t getLostSeq();
 
 private:
-   // 序列号起始
+   // 数组，记录起始序列号
    int32_t* m_piData1;                  // sequence number starts
-   // 序列号结束
+   // 数组，记录终止序列号
    int32_t* m_piData2;                  // seqnence number ends
-   // 下一个节点
+   // 数组，极了下一个节点在 m_piData1  和 m_piData2 中的位置
    int* m_piNext;                       // next node in the list
 
-   // list中的第一个节点
+   // 第一个节点的索引
    int m_iHead;                         // first node
    // 丢了多少个包，按序列号进行统计
    int m_iLength;                       // loss length

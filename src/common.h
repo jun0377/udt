@@ -281,7 +281,7 @@ public:
    {return (m_iMaxSeqNo - seq >= inc) ? seq + inc : seq - m_iMaxSeqNo + inc - 1;}
 
 public:
-   // 比较序列号时使用的阈值，是序列号最大值的一半；当两个序列号的差值超过这个值时，说明已经超出了最大序列号范围，计算时需要加上m_iMaxSeqNo
+   // 比较序列号时使用的阈值，是序列号最大值的一半；当两个序列号的差值小于这个阈值时，表示这两个序列号在逻辑上是相近的
    static const int32_t m_iSeqNoTH;             // threshold for comparing seq. no.
    // 序列号最大值
    static const int32_t m_iMaxSeqNo;            // maximum sequence number used in UDT

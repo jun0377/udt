@@ -434,7 +434,7 @@ void CSndUList::insert_(int64_t ts, const CUDT* u)
    m_pHeap[m_iLastEntry] = n;
    n->m_llTimeStamp = ts;
 
-   // 小根堆调整，按时间戳调整,堆顶节点一定是时间戳最小的节点
+   // 堆排序，按时间戳进行小根堆排序,堆顶节点一定是时间戳最小的节点
    int q = m_iLastEntry;
    int p = q;
    while (p != 0)
@@ -452,7 +452,7 @@ void CSndUList::insert_(int64_t ts, const CUDT* u)
          break;
    }
 
-   // 更新待发送数据在堆中的位置
+   // 更新堆索引
    n->m_iHeapLoc = q;
 
    // an earlier event has been inserted, wake up sending worker
@@ -462,7 +462,7 @@ void CSndUList::insert_(int64_t ts, const CUDT* u)
    }
 
    // first entry, activate the sending queue
-   // 第一次执行到此处时，唤醒发送队列
+   // 当堆中没有数据时，唤醒发送线程，执行退出操作
    if (0 == m_iLastEntry)
    {
       #ifndef WIN32

@@ -2393,27 +2393,30 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
    int payload = 0;
    bool probe = false;
 
-   // 获取当前时间戳
+   // 当前时间
    uint64_t entertime;
    CTimer::rdtsc(entertime);
 
-   // 计算当前时间到下一次发送的时间间隔
+   // 当前时间与计划发送时间的差值
    if ((0 != m_ullTargetTime) && (entertime > m_ullTargetTime))
       m_ullTimeDiff += entertime - m_ullTargetTime;
 
    // Loss retransmission always has higher priority.
-   // 丢包重传优先级最高
+   // 丢包重传队列的优先级最高，先处理丢包队列中的数据
+   // 注意这里是个赋值操作，并不是尽心比较
    if ((packet.m_iSeqNo = m_pSndLossList->getLostSeq()) >= 0)
    {
       // protect m_iSndLastDataAck from updating by ACK processing
       CGuard ackguard(m_AckLock);
 
+      // 序列号偏移量
       int offset = CSeqNo::seqoff(m_iSndLastDataAck, packet.m_iSeqNo);
       if (offset < 0)
          return 0;
 
       int msglen;
 
+      // 从发送缓冲区中读取数据
       payload = m_pSndBuffer->readData(&(packet.m_pcData), offset, packet.m_iMsgNo, msglen);
 
       if (-1 == payload)

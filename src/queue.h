@@ -154,10 +154,10 @@ struct CSNode
 {
    // 关联的CUDT实例
    CUDT* m_pUDT;		// Pointer to the instance of CUDT socket
-   // 时间戳
+   // 调度时间戳
    uint64_t m_llTimeStamp;      // Time Stamp
 
-   // 在堆中的位置
+   // 堆节点索引
    int m_iHeapLoc;		// location on the heap, -1 means not on the heap
 };
 
@@ -192,7 +192,7 @@ public:
       // Returned value:
       //    None.
 
-   // 更新UDT实例的时间戳，有什么用？
+   // 更新待发送数据的状态，将其调整到堆顶位置，已便尽快处理
    void update(const CUDT* u, bool reschedule = true);
 
       // Functionality:
@@ -250,6 +250,7 @@ private:
    CTimer* m_pTimer;
 
 private:
+   // 仅声明未实现，禁用拷贝构造和赋值运算符
    CSndUList(const CSndUList&);
    CSndUList& operator=(const CSndUList&);
 };
