@@ -83,6 +83,16 @@ CSndLossList::~CSndLossList()
    #endif
 }
 
+/*
+   向重传列表中插入序列号
+   1. 使用两个数组m_piData1和m_piData2分别保存起始序列号和终止序列号
+   2. 使用m_piNext数组来记录下一个节点的位置
+   3. 如果重传列表为空，则直接插入到head节点，即插入到头部位置
+   4. 如果重传列表不为空，通过序列号偏移量寻找合适的插入位置
+   5. 更新丢包计数m_iLength
+   6. 返回丢包列表增加的长度
+*/
+
 int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
 {
    // lock_guard
@@ -242,19 +252,22 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
          }
       }
    }
+   // offset == 0, 说明新的序列号与head节点的序列号相同，直接返回
    else
    {
       m_iLastInsertPos = m_iHead;
 
       // insert to head node
-      // 插入到head节点
+      // seqno2 != seqno1说明不止一个丢包，需要更新loc位置的终止序列号
       if (seqno2 != seqno1)
       {
+         // loc位置的终止序列号不存在，更新终止序列号
          if (-1 == m_piData2[loc])
          {
             m_iLength += CSeqNo::seqlen(seqno1, seqno2) - 1;
             m_piData2[loc] = seqno2;
          }
+         // loc位置的终止序列号比新的序列号小，进行合并
          else if (CSeqNo::seqcmp(seqno2, m_piData2[loc]) > 0)
          {
             m_iLength += CSeqNo::seqlen(m_piData2[loc], seqno2) - 1;
@@ -268,46 +281,62 @@ int CSndLossList::insert(int32_t seqno1, int32_t seqno2)
    }
 
    // coalesce with next node. E.g., [3, 7], ..., [6, 9] becomes [3, 9] 
-   // 与下一个节点合并。例：[3,7]，……，[6,9]变成[3,9]
+   // 检查并合并相邻或重叠的序列号范围，例：[3,7]，……，[6,9]变成[3,9]
    while ((-1 != m_piNext[loc]) && (-1 != m_piData2[loc]))
    {
       int i = m_piNext[loc];
 
+      // 如果下一个节点的起始序列号小于等于loc位置的终止序列号，说明有重叠
       if (CSeqNo::seqcmp(m_piData1[i], CSeqNo::incseq(m_piData2[loc])) <= 0)
       {
          // coalesce if there is overlap
-         // 合并节点
+         // 下一个节点的终止序列号存在，进行合并
          if (-1 != m_piData2[i])
          {
+            // 下一个节点的终止序列号大于当前节点的终止序列号，进行合并
             if (CSeqNo::seqcmp(m_piData2[i], m_piData2[loc]) > 0)
             {
+               // 下一个节点的起始序列号小于等于当前节点的终止序列号
                if (CSeqNo::seqcmp(m_piData2[loc], m_piData1[i]) >= 0)
                   m_iLength -= CSeqNo::seqlen(m_piData1[i], m_piData2[loc]);
 
+               // 更新当前节点的终止序列号
                m_piData2[loc] = m_piData2[i];
             }
+            // 下一个节点的终止序列号小于等于当前节点的终止序列号
             else
-               m_iLength -= CSeqNo::seqlen(m_piData1[i], m_piData2[i]);
+               m_iLength -= CSeqNo::seqlen(m_piData1[i], m_piData2[i]); // 减去被合并的长度
          }
+         // 下一个节点不存在终止序列号
          else
          {
+            // 检查是否有相邻的序列号，即下一个节点的起始序列号等于当前节点的终止序列号加1
             if (m_piData1[i] == CSeqNo::incseq(m_piData2[loc]))
                m_piData2[loc] = m_piData1[i];
             else
                m_iLength --;
          }
 
+         // 删除被合并的节点
          m_piData1[i] = -1;
          m_piData2[i] = -1;
+         // 更新下一个节点的索引
          m_piNext[loc] = m_piNext[i];
       }
       else
          break;
    }
 
+   // 返回丢包列表增加的长度
    return m_iLength - origlen;
 }
 
+/*
+   1. 找到目标序列号seqno在数组中的位置loc
+   2. 创建一个新的节点，新节点的起始序列号为seqno+1,终止序列号需要根据旧节点的情况进行计算
+   3. 将这个新的节点作为头节点
+   4. 删除所有新的头节点之前的数据
+*/
 void CSndLossList::remove(int32_t seqno)
 {
    CGuard listguard(m_ListLock);
@@ -316,90 +345,119 @@ void CSndLossList::remove(int32_t seqno)
       return;
 
    // Remove all from the head pointer to a node with a larger seq. no. or the list is empty
-   // 计算从头节点到目标序列号 seqno 的偏移量 offset
+   // 计算从头节点起始序列号到目标序列号 seqno 的偏移量 offset
    int offset = CSeqNo::seqoff(m_piData1[m_iHead], seqno);
    // 计算目标序列号 seqno 在数组中的位置 loc
    int loc = (m_iHead + offset + m_iSize) % m_iSize;
 
-   // offset==0, 说明目标序列号 seqno 是头节点
+   // 处理头节点匹配的情况，offset==0, 说明目标序列号seqno就是头节点的起始序列号
+   // 构建一个新的节点，起始序列号为seqno+1,终止序列号仍然为就得值
+   // 将新的节点作为头节点
    if (0 == offset)
    {
       // It is the head. Remove the head and point to the next node
-      // 目标序列号 seqno 是头节点，删除头节点，并将头节点指向下一个节点
+      // 计算新的位置，删除loc之前的序列号
       loc = (loc + 1) % m_iSize;
 
       // 头节点没有终止序列号，说明只有一个序列号的包被丢弃了，直接更新loc
       if (-1 == m_piData2[m_iHead]){
          loc = m_piNext[m_iHead];
       }
+      // 头节点有终止序列号
       else
       {
-         // 从m_piData1数值中删除指定所有小于等于seqno的序列号
+         // 构建一个新的节点，起始序列号为seqno+1;
          m_piData1[loc] = CSeqNo::incseq(seqno);
-         // 更新终止序列号
+         // 新节点的终止序列号仍为旧值
          if (CSeqNo::seqcmp(m_piData2[m_iHead], CSeqNo::incseq(seqno)) > 0)
             m_piData2[loc] = m_piData2[m_iHead];
 
+         // 清除原头节点
          m_piData2[m_iHead] = -1;
-
+         // 更新新节点的下一个节点索引，维护链表结构
          m_piNext[loc] = m_piNext[m_iHead];
       }
 
+      // 清除原头节点的起始序列
       m_piData1[m_iHead] = -1;
-
+      // 更新最新插入位置的索引
       if (m_iLastInsertPos == m_iHead)
          m_iLastInsertPos = -1;
 
+      // 更新头节点索引为新构建的节点
       m_iHead = loc;
 
+      // 丢包统计
       m_iLength --;
    }
-   // offset>0, 说明目标序列号 seqno 在数组中位置在head节点之后
+   // offset>0, 说明seqno不在头节点中
    else if (offset > 0)
    {
+      // 保存原始头节点
       int h = m_iHead;
 
-      // 目标序列号 seqno 是当前节点
+      // seqno恰好是某个节点的起始序列号
       if (seqno == m_piData1[loc])
       {
          // target node is not empty, remove part/all of the seqno in the node.
+         // 保存当前节点索引
          int temp = loc;
+         // 构建新节点
          loc = (loc + 1) % m_iSize;
 
-         if (-1 == m_piData2[temp])
+         // 当前节点只有起始序列号，没有终止序列号，即当前节点只表示一个序列号
+         if (-1 == m_piData2[temp]){
+            // 更新头节点索引，直接跳过当前节点
             m_iHead = m_piNext[temp];
+         }
+         // 当前节点有终止序列号
          else
          {
             // remove part, e.g., [3, 7] becomes [], [4, 7] after remove(3)
+            // 构建新节点，新节点的起始序列号为seqno+1
             m_piData1[loc] = CSeqNo::incseq(seqno);
+            // 新节点的起始序列号小于当前节点的终止序列号,更新新节点的终止序列号
             if (CSeqNo::seqcmp(m_piData2[temp], m_piData1[loc]) > 0)
                m_piData2[loc] = m_piData2[temp];
+
+            // 更新头节点索引
             m_iHead = loc;
+            // 更新头节点的下一个节点的索引，维护链表结构
             m_piNext[loc] = m_piNext[temp];
+            // 清除原节点信息
             m_piNext[temp] = loc;
             m_piData2[temp] = -1;
          }
       }
+      // seqno在某个节点的序列号范围内
       else
       {
          // target node is empty, check prior node
          int i = m_iHead;
+         // 查找seqno所在的节点
          while ((-1 != m_piNext[i]) && (CSeqNo::seqcmp(m_piData1[m_piNext[i]], seqno) < 0))
             i = m_piNext[i];
 
+         // 构建新节点，只保存所有大于seqno的序列号
          loc = (loc + 1) % m_iSize;
 
+         // 当前节点没有终止序列号的情况，说明seqno是当前节点的起始序列号
          if (-1 == m_piData2[i])
             m_iHead = m_piNext[i];
+         // 当前节点的终止序列号大于seqno
          else if (CSeqNo::seqcmp(m_piData2[i], seqno) > 0)
          {
             // remove part/all seqno in the prior node
+            // 新节点保存大于seqno的序列号
             m_piData1[loc] = CSeqNo::incseq(seqno);
+            // 当前节点的终止序列号比新节点的起始序列号大，更新新节点的终止序列号
             if (CSeqNo::seqcmp(m_piData2[i], m_piData1[loc]) > 0)
                m_piData2[loc] = m_piData2[i];
 
+            // 更新当前节点的终止序列号
             m_piData2[i] = seqno;
 
+            // 维护链表结构
             m_piNext[loc] = m_piNext[i];
             m_piNext[i] = loc;
 
@@ -410,6 +468,7 @@ void CSndLossList::remove(int32_t seqno)
       }
 
       // Remove all nodes prior to the new head
+      // 清理所有在新的头节点之前的节点
       while (h != m_iHead)
       {
          if (m_piData2[h] != -1)
@@ -451,28 +510,36 @@ int32_t CSndLossList::getLostSeq()
       m_iLastInsertPos = -1;
 
    // return the first loss seq. no.
+   // 获取头节点的起始序列号
    int32_t seqno = m_piData1[m_iHead];
 
    // head moves to the next node
+   // 头节点的终止序列号不存在，说明只有一个序列号的包被丢弃了，直接更新头节点
    if (-1 == m_piData2[m_iHead])
    {
       //[3, -1] becomes [], and head moves to next node in the list
       m_piData1[m_iHead] = -1;
       m_iHead = m_piNext[m_iHead];
    }
+   // 头节点的终止序列号存在，更新头节点
    else
    {
       // shift to next node, e.g., [3, 7] becomes [], [4, 7]
       int loc = (m_iHead + 1) % m_iSize;
 
+      // 构建新节点，新节点的起始序列号为seqno+1
       m_piData1[loc] = CSeqNo::incseq(seqno);
+      // 更新新节点的终止序列号
       if (CSeqNo::seqcmp(m_piData2[m_iHead], m_piData1[loc]) > 0)
          m_piData2[loc] = m_piData2[m_iHead];
 
+      // 清除原头节点
       m_piData1[m_iHead] = -1;
       m_piData2[m_iHead] = -1;
 
+      // 更新新节点的下一个节点索引，维护链表结构
       m_piNext[loc] = m_piNext[m_iHead];
+      // 更新头节点索引为新节点
       m_iHead = loc;
    }
 
