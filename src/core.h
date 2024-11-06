@@ -514,7 +514,7 @@ private: // Timers
    volatile uint64_t m_ullACKInt;		// ACK interval
    // NACK包的时间间隔
    volatile uint64_t m_ullNAKInt;		// NAK interval
-   // 对端相应的时间戳
+   // 对端相应的时间戳，用于超时检测
    volatile uint64_t m_ullLastRspTime;		// time stamp of last response from the peer
 
    // NACK超时下限，超时将重传

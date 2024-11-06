@@ -1065,7 +1065,7 @@ void CUDT::close()
    m_bOpened = false;
 }
 
-// 将数据放入发送缓冲区中，由内部决定何时发送
+// 将数据放入发送缓冲区中，等待调度
 int CUDT::send(const char* data, int len)
 {
    if (UDT_DGRAM == m_iSockType)
@@ -1087,14 +1087,20 @@ int CUDT::send(const char* data, int len)
    if (m_pSndBuffer->getCurrBufSize() == 0)
    {
       // delay the EXP timer to avoid mis-fired timeout
+      /* 
+         当发送缓冲区为空时，说明之前的数据都已发送
+         此时不应该触发超时检测，更新响应时间可以防止错误的超时判断
+      */
       uint64_t currtime;
       CTimer::rdtsc(currtime);
       m_ullLastRspTime = currtime;
    }
 
-   // 发送缓冲区中的数据量小于等于发送缓冲区中已使用的数据块容量
-   // 如果是非阻塞发送且缓冲区已满，抛出异常，避免丢包
-   // 如果是阻塞发送，等待缓冲区有空闲位置
+   /*
+      发送缓冲区已满的情况
+      如果是非阻塞发送且缓冲区已满，抛出异常，避免丢包
+      如果是阻塞发送，等待缓冲区有空闲位置
+   */
    if (m_iSndBufSize <= m_pSndBuffer->getCurrBufSize())
    {
       // 非阻塞发送
