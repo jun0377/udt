@@ -568,16 +568,21 @@ CSndQueue::~CSndQueue()
    delete m_pSndUList;
 }
 
+// 初始化，创建了一个发送数据的工作线程
 void CSndQueue::init(CChannel* c, CTimer* t)
 {
+   // 关联UDP通道
    m_pChannel = c;
+   // 关联定时器
    m_pTimer = t;
+   // 创建发送列表
    m_pSndUList = new CSndUList;
    m_pSndUList->m_pWindowLock = &m_WindowLock;
    m_pSndUList->m_pWindowCond = &m_WindowCond;
    m_pSndUList->m_pTimer = m_pTimer;
 
    #ifndef WIN32
+      // 创建工作线程
       if (0 != pthread_create(&m_WorkerThread, NULL, CSndQueue::worker, this))
       {
          m_WorkerThread = 0;
@@ -592,6 +597,7 @@ void CSndQueue::init(CChannel* c, CTimer* t)
 }
 
 #ifndef WIN32
+   // 从SndList中pop数据，通过UDP通道发送到对端
    void* CSndQueue::worker(void* param)
 #else
    DWORD WINAPI CSndQueue::worker(LPVOID param)
@@ -601,27 +607,35 @@ void CSndQueue::init(CChannel* c, CTimer* t)
 
    while (!self->m_bClosing)
    {
+      // 下一次发送数据的时间，即调度时间
       uint64_t ts = self->m_pSndUList->getNextProcTime();
 
+      // ts > 0, 说明有数据需要发送
       if (ts > 0)
       {
          // wait until next processing time of the first socket on the list
+         // 休眠至调度时间
          uint64_t currtime;
          CTimer::rdtsc(currtime);
          if (currtime < ts)
-            self->m_pTimer->sleepto(ts);
+            self->m_pTimer->sleepto(ts);  // 休眠
 
+         // 发送数据
          // it is time to send the next pkt
          sockaddr* addr;
          CPacket pkt;
+         // 从发送列表中pop数据
          if (self->m_pSndUList->pop(addr, pkt) < 0)
             continue;
 
+         // 通过UDP通道发送数据
          self->m_pChannel->sendto(addr, pkt);
       }
+      // 没有数据需要发送，休眠
       else
       {
          // wait here if there is no sockets with data to be sent
+         // 等待条件变量m_WindowCond
          #ifndef WIN32
             pthread_mutex_lock(&self->m_WindowLock);
             if (!self->m_bClosing && (self->m_pSndUList->m_iLastEntry < 0))
@@ -713,6 +727,7 @@ void CRcvUList::remove(const CUDT* u)
    n->m_pNext = n->m_pPrev = NULL;
 }
 
+// 更新一个UDT实例，将其调整到链表的末尾
 void CRcvUList::update(const CUDT* u)
 {
    CRNode* n = u->m_pRNode;
@@ -723,14 +738,17 @@ void CRcvUList::update(const CUDT* u)
    CTimer::rdtsc(n->m_llTimeStamp);
 
    // if n is the last node, do not need to change
+   // 已经是最后一个节点了，不必进行调整
    if (NULL == n->m_pNext)
       return;
 
+   // 当前节点是第一个节点的情况
    if (NULL == n->m_pPrev)
    {
       m_pUList = n->m_pNext;
       m_pUList->m_pPrev = NULL;
    }
+   // 当前节点是中间节点的情况
    else
    {
       n->m_pPrev->m_pNext = n->m_pNext;
@@ -1027,22 +1045,39 @@ CRcvQueue::~CRcvQueue()
    }
 }
 
+/*
+   接收队列初始化
+   1. 初始化数据单元队列
+   2. 初始化哈希表
+   3. 关联UDP通道
+   4. 关联定时器
+   5. 初始化UDT接收实例列表
+   6. 初始化会合连接模式
+   7. 创建接收数据的工作线程
+ */
 void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* cc, CTimer* t)
 {
+   // 数据包负载大小
    m_iPayloadSize = payload;
 
+   // 数据单元队列初始化
    m_UnitQueue.init(qsize, payload, version);
 
+   // 哈希表初始化
    m_pHash = new CHash;
    m_pHash->init(hsize);
 
+   // 关联UDP通道
    m_pChannel = cc;
+   // 关联定时器
    m_pTimer = t;
-
+   // UDT接收实例列表初始化
    m_pRcvUList = new CRcvUList;
+   // 会合连接模式
    m_pRendezvousQueue = new CRendezvousQueue;
 
    #ifndef WIN32
+      // 接收数据的工作线程
       if (0 != pthread_create(&m_WorkerThread, NULL, CRcvQueue::worker, this))
       {
          m_WorkerThread = 0;
@@ -1193,14 +1228,23 @@ TIMER_CHECK:
    #endif
 }
 
+/*
+   从接收缓冲区中读取指定UDT套接字的packet
+   1. 先根据UDTSOCKET找到对应的packet队列
+   2. 从packet队列中获取最早的packet
+   3. 释放空间，返回数据包长度
+*/
 int CRcvQueue::recvfrom(int32_t id, CPacket& packet)
 {
    CGuard bufferlock(m_PassLock);
 
+   // 从缓冲区中查找指定ID的packet队列
    map<int32_t, std::queue<CPacket*> >::iterator i = m_mBuffer.find(id);
 
+   // 没有找到packet,在条件变量m_PassCond上休眠等待，最多等待大约1秒
    if (i == m_mBuffer.end())
    {
+      // 最多等待大约1秒
       #ifndef WIN32
          uint64_t now = CTimer::getTime();
          timespec timeout;
@@ -1208,6 +1252,7 @@ int CRcvQueue::recvfrom(int32_t id, CPacket& packet)
          timeout.tv_sec = now / 1000000 + 1;
          timeout.tv_nsec = (now % 1000000) * 1000;
 
+         // 在条件变量m_PassCond上休眠等待，最多等待大约1秒
          pthread_cond_timedwait(&m_PassCond, &m_PassLock, &timeout);
       #else
          ReleaseMutex(m_PassLock);
@@ -1215,7 +1260,9 @@ int CRcvQueue::recvfrom(int32_t id, CPacket& packet)
          WaitForSingleObject(m_PassLock, INFINITE);
       #endif
 
+      // 再次检查缓冲区中是否存在指定ID的packet
       i = m_mBuffer.find(id);
+      // 不存在，返回-1
       if (i == m_mBuffer.end())
       {
          packet.setLength(-1);
@@ -1223,9 +1270,13 @@ int CRcvQueue::recvfrom(int32_t id, CPacket& packet)
       }
    }
 
+   // 到这一步，说明找到了对应的packet队列
+
    // retrieve the earliest packet
+   // 获取最早的packet
    CPacket* newpkt = i->second.front();
 
+   // 检查数据包长度，确保packet的容量足够大
    if (packet.getLength() < newpkt->getLength())
    {
       packet.setLength(-1);
@@ -1233,19 +1284,24 @@ int CRcvQueue::recvfrom(int32_t id, CPacket& packet)
    }
 
    // copy packet content
+   // 拷贝数据包
    memcpy(packet.m_nHeader, newpkt->m_nHeader, CPacket::m_iPktHdrSize);
    memcpy(packet.m_pcData, newpkt->m_pcData, newpkt->getLength());
    packet.setLength(newpkt->getLength());
 
+   // 释放空间
    delete [] newpkt->m_pcData;
    delete newpkt;
 
    // remove this message from queue, 
    // if no more messages left for this socket, release its data structure
+   // 从packet队列中删除这个packet
    i->second.pop();
+   // 如果这个packet队列中没有更多的packet，则删除这个packet队列
    if (i->second.empty())
       m_mBuffer.erase(i);
 
+   // 返回数据包长度
    return packet.getLength();
 }
 

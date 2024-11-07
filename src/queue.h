@@ -257,12 +257,16 @@ private:
 
 struct CRNode
 {
+   // UDT接收实例
    CUDT* m_pUDT;                // Pointer to the instance of CUDT socket
+   // 时间戳
    uint64_t m_llTimeStamp;      // Time Stamp
 
+   // 链表结构
    CRNode* m_pPrev;             // previous link
    CRNode* m_pNext;             // next link
 
+   // 当前节点是否已经在链表中
    bool m_bOnList;              // if the node is already on the list
 };
 
@@ -281,6 +285,7 @@ public:
       // Returned value:
       //    None.
 
+   // 插入一个UDT实例
    void insert(const CUDT* u);
 
       // Functionality:
@@ -290,6 +295,7 @@ public:
       // Returned value:
       //    None.
 
+   // 删除一个UDT实例
    void remove(const CUDT* u);
 
       // Functionality:
@@ -299,15 +305,19 @@ public:
       // Returned value:
       //    None.
 
+   // 更新一个UDT实例，将其调整到链表的末尾
    void update(const CUDT* u);
 
 public:
+   // 接收队列的头节点
    CRNode* m_pUList;		// the head node
 
 private:
+   // 接收队列的尾节点
    CRNode* m_pLast;		// the last node
 
 private:
+   // 禁用拷贝构造和赋值运算符
    CRcvUList(const CRcvUList&);
    CRcvUList& operator=(const CRcvUList&);
 };
@@ -430,6 +440,7 @@ public:
       // Returned value:
       //    None.
 
+   // 初始化，创建了一个发送数据的工作线程
    void init(CChannel* c, CTimer* t);
 
       // Functionality:
@@ -440,10 +451,12 @@ public:
       // Returned value:
       //    Size of data sent out.
 
+   // 将数据立即通过UDP通道发送到对端，不经过发送缓冲机制
    int sendto(const sockaddr* addr, CPacket& packet);
 
 private:
 #ifndef WIN32
+   // 用于发送数据的工作线程
    static void* worker(void* param);
 #else
    static DWORD WINAPI worker(LPVOID param);
@@ -452,18 +465,24 @@ private:
    pthread_t m_WorkerThread;
 
 private:
-   // 使用一个小根堆来存储待发送的数据，堆中的节点按时间戳进行排序
+   // 发送列表使用一个小根堆来存储待发送的数据，堆中的节点按时间戳进行排序
    CSndUList* m_pSndUList;		// List of UDT instances for data sending
+   // 关联的UDP通道
    CChannel* m_pChannel;                // The UDP channel for data sending
+   // 定时器
    CTimer* m_pTimer;			// Timing facility
 
+   // 等待m_pSndUList中有数据的条件变量
    pthread_mutex_t m_WindowLock;
    pthread_cond_t m_WindowCond;
 
+   // 关闭工作线程时使用
    volatile bool m_bClosing;		// closing the worker
+   // 工作线程退出时使用的条件变量
    pthread_cond_t m_ExitCond;
 
 private:
+   // 禁用拷贝构造函数和赋值运算符
    CSndQueue(const CSndQueue&);
    CSndQueue& operator=(const CSndQueue&);
 };
@@ -503,7 +522,7 @@ public:
       // Returned value:
       //    Data size of the packet
 
-   // 接收一个packet
+   // 从接收缓冲区中读取指定UDT套接字的packet
    int recvfrom(int32_t id, CPacket& packet);
 
 private:
