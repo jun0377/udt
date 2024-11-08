@@ -1373,25 +1373,34 @@ CUDT* CRcvQueue::getNewEntry()
    return u;
 }
 
+// 保存握手阶段的控制报文
 void CRcvQueue::storePkt(int32_t id, CPacket* pkt)
 {
+   // lock_guard
    CGuard bufferlock(m_PassLock);   
 
+   // 查找指定的UDTSOCKET
    map<int32_t, std::queue<CPacket*> >::iterator i = m_mBuffer.find(id);
 
+   // UDTSOCKET不存在，则创建一个新的队列
    if (i == m_mBuffer.end())
    {
       m_mBuffer[id].push(pkt);
 
+      // 唤醒CRcvQueue::recvfrom，从接收缓冲区中取数据
       #ifndef WIN32
          pthread_cond_signal(&m_PassCond);
       #else
          SetEvent(m_PassCond);
       #endif
    }
+   // UDTSOCKET存在，向队尾添加packet
    else
    {
       //avoid storing too many packets, in case of malfunction or attack
+      // 避免存储太多的packet，最多存储16个packets
+      // 队列m_mBuffer存储的是握手阶段的控制包，而不是数据包
+      // 限制为16可以避免对端短时间内快速创建多个连接，防止握手阶段的Dos攻击
       if (i->second.size() > 16)
          return;
 

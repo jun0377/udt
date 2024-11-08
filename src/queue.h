@@ -522,7 +522,7 @@ public:
       // Returned value:
       //    Data size of the packet
 
-   // 从接收缓冲区中读取指定UDT套接字的packet
+   // 取握手阶段的控制报文
    int recvfrom(int32_t id, CPacket& packet);
 
 private:
@@ -586,6 +586,7 @@ private:
    std::vector<CUDT*> m_vNewEntry;                      // newly added entries, to be inserted
    pthread_mutex_t m_IDLock;
 
+   // 存储握手阶段的控制报文
    std::map<int32_t, std::queue<CPacket*> > m_mBuffer;	// temporary buffer for rendezvous connection request
    pthread_mutex_t m_PassLock;
    // 用于在没有数据包时等待
