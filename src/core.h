@@ -418,7 +418,7 @@ private: // Sending related data
 private: // Receiving related data
    // 接收缓冲区
    CRcvBuffer* m_pRcvBuffer;                    // Receiver buffer
-   // 接收丢包记录
+   // 接收端的丢包列表
    CRcvLossList* m_pRcvLossList;                // Receiver loss list
    // 滑动窗口
    CACKWindow* m_pACKWindow;                    // ACK history window
@@ -470,8 +470,10 @@ private: // Trace
    uint64_t m_StartTime;                        // timestamp when the UDT entity is started
    // 发送数据包总数，包含重传的包
    int64_t m_llSentTotal;                       // total number of sent data packets, including retransmissions
+   // 接受数据包总数
    int64_t m_llRecvTotal;                       // total number of received packets
    int m_iSndLossTotal;                         // total number of lost packets (sender side)
+   // 接收侧丢包统计
    int m_iRcvLossTotal;                         // total number of lost packets (receiver side)
    int m_iRetransTotal;                         // total number of retransmitted packets
    int m_iSentACKTotal;                         // total number of sent ACK packets
@@ -482,10 +484,12 @@ private: // Trace
 
    // 最后一次统计状态时的时间戳
    uint64_t m_LastSampleTime;                   // last performance sample time
-   // 上一次统计到最新一次统计这段时间间隔内发送数据包的数量
+   // 最近一个统计周期内，发送数据包的数量
    int64_t m_llTraceSent;                       // number of pakctes sent in the last trace interval
+   // 最近一个统计周期内，接收数据包的数量
    int64_t m_llTraceRecv;                       // number of pakctes received in the last trace interval
    int m_iTraceSndLoss;                         // number of lost packets in the last trace interval (sender side)
+   // 最近一个统计收起内，丢包数量
    int m_iTraceRcvLoss;                         // number of lost packets in the last trace interval (receiver side)
    int m_iTraceRetrans;                         // number of retransmitted packets in the last trace interval
    int m_iSentACK;                              // number of ACKs sent in the last trace interval

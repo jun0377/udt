@@ -712,7 +712,7 @@ const int CUDTException::EPEERERR = 7000;
 const int CUDTException::EUNKNOWN = -1;
 
 
-//
+// 检查地址addr1和addr1的地址是否相同
 bool CIPAddress::ipcmp(const sockaddr* addr1, const sockaddr* addr2, int ver)
 {
    if (AF_INET == ver)

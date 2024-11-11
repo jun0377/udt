@@ -2084,6 +2084,7 @@ void CUDT::sendCtrl(int pkttype, void* lparam, void* rparam, int size)
    }
 }
 
+// 处理控制包
 void CUDT::processCtrl(CPacket& ctrlpkt)
 {
    // Just heard from the peer, reset the expiration count.
@@ -2522,67 +2523,93 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
    return payload;
 }
 
+// 处理数据包
 int CUDT::processData(CUnit* unit)
 {
+   // 获取数据包
    CPacket& packet = unit->m_Packet;
 
    // Just heard from the peer, reset the expiration count.
+   // 重置超时计数器
    m_iEXPCount = 1;
+   // 当前时间戳
    uint64_t currtime;
    CTimer::rdtsc(currtime);
+   // 更新响应时间戳
    m_ullLastRspTime = currtime;
 
+   // 拥塞控制
    m_pCC->onPktReceived(&packet);
+   // 数据包计数
    ++ m_iPktCount;
    // update time information
+   // 更新接受时间窗口信息，用于计算码率和带宽
    m_pRcvTimeWindow->onPktArrival();
 
    // check if it is probing packet pair
+   // 检查是否是探测包，每16个包发送一对探测包
    if (0 == (packet.m_iSeqNo & 0xF))
       m_pRcvTimeWindow->probe1Arrival();
    else if (1 == (packet.m_iSeqNo & 0xF))
       m_pRcvTimeWindow->probe2Arrival();
 
+   // 最近一个统计周期内，接收数据包
    ++ m_llTraceRecv;
+   // 接受数据包总数
    ++ m_llRecvTotal;
 
+   // 计算序列号偏移量
    int32_t offset = CSeqNo::seqoff(m_iRcvLastAck, packet.m_iSeqNo);
+   // 偏移量有效性检查
    if ((offset < 0) || (offset >= m_pRcvBuffer->getAvailBufSize()))
       return -1;
 
+   // 将数据包添加到接收缓冲区
    if (m_pRcvBuffer->addData(unit, offset) < 0)
       return -1;
 
    // Loss detection.
+   // 丢包检测与处理，当前序列号大于期望序列号，说明有丢包
    if (CSeqNo::seqcmp(packet.m_iSeqNo, CSeqNo::incseq(m_iRcvCurrSeqNo)) > 0)
    {
       // If loss found, insert them to the receiver loss list
+      // 更新接收端的丢包列表
       m_pRcvLossList->insert(CSeqNo::incseq(m_iRcvCurrSeqNo), CSeqNo::decseq(packet.m_iSeqNo));
 
       // pack loss list for NAK
+      // 计算NAK 否定确认数据
       int32_t lossdata[2];
-      lossdata[0] = CSeqNo::incseq(m_iRcvCurrSeqNo) | 0x80000000;
+      lossdata[0] = CSeqNo::incseq(m_iRcvCurrSeqNo) | 0x80000000; // 最高位设置为1，表示控制报文
       lossdata[1] = CSeqNo::decseq(packet.m_iSeqNo);
 
       // Generate loss report immediately.
+      // 立即向对端报告丢包， 3表示是一个NAK包
       sendCtrl(3, NULL, lossdata, (CSeqNo::incseq(m_iRcvCurrSeqNo) == CSeqNo::decseq(packet.m_iSeqNo)) ? 1 : 2);
 
+      // 更新读报统计信息
       int loss = CSeqNo::seqlen(m_iRcvCurrSeqNo, packet.m_iSeqNo) - 2;
+      // 最近一个统计周期内，丢包数量
       m_iTraceRcvLoss += loss;
+      // 丢包总数
       m_iRcvLossTotal += loss;
    }
 
    // This is not a regular fixed size packet...   
    //an irregular sized packet usually indicates the end of a message, so send an ACK immediately   
+   // 包长度不等于标准负载大小，表示一个消息的结束
    if (packet.getLength() != m_iPayloadSize)   
       CTimer::rdtsc(m_ullNextACKTime); 
 
    // Update the current largest sequence number that has been received.
    // Or it is a retransmitted packet, remove it from receiver loss list.
-   if (CSeqNo::seqcmp(packet.m_iSeqNo, m_iRcvCurrSeqNo) > 0)
+   // 更新最大序列号,注意：并不是小于这个序列号的包都已经被确认了，包含待重传的包
+   if (CSeqNo::seqcmp(packet.m_iSeqNo, m_iRcvCurrSeqNo) > 0){
       m_iRcvCurrSeqNo = packet.m_iSeqNo;
-   else
+   }
+   // 如果是一个重传包，从接收侧丢包列表中移除
+   else{
       m_pRcvLossList->remove(packet.m_iSeqNo);
+   }
 
    return 0;
 }

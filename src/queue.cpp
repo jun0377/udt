@@ -223,6 +223,7 @@ int CUnitQueue::shrink()
    return -1;
 }
 
+// 获取一个空闲的数据单元
 CUnit* CUnitQueue::getNextAvailUnit()
 {
    // m_iCount > 0.9 * m_iSize; 即堆空间的使用率超过了90%，需要扩容
@@ -1091,6 +1092,14 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
    #endif
 }
 
+// UDT接收队列工作线程，处理接收到的数据包
+/*
+   1. 首先检查是否有新的连接，如果有，则将新的连接插入到UDT接收实例列表和哈希表中
+   2. 接受新的包，判断是数据包还是控制包，按相应类型进行处理
+   3. m_pUList中存储这新接受到的数据包，需要更新m_pUList列表的状态
+   4. 释放资源
+*/
+
 #ifndef WIN32
    void* CRcvQueue::worker(void* param)
 #else
@@ -1105,23 +1114,31 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
 
    while (!self->m_bClosing)
    {
+      // 禁止忙等，通过m_pTimer->tick()让出CPU时间片
       #ifdef NO_BUSY_WAITING
          self->m_pTimer->tick();
       #endif
 
       // check waiting list, if new socket, insert it to the list
+      // 检查是否有新的连接待处理
       while (self->ifNewEntry())
       {
+         // 获取第一个待处理的连接
          CUDT* ne = self->getNewEntry();
          if (NULL != ne)
          {
+            // 插入到UDT接收实例列表
             self->m_pRcvUList->insert(ne);
+            // 插入到哈希表
             self->m_pHash->insert(ne->m_SocketID, ne);
          }
       }
 
       // find next available slot for incoming packet
+      // 从m_UnitQueue中获取一个空闲的数据单元
       CUnit* unit = self->m_UnitQueue.getNextAvailUnit();
+      // 接收缓冲区已满，则跳过这个数据包
+      // 这个数据包被丢弃了吗？还是由于没有向发送端返回ACK，发送端会进行重传？
       if (NULL == unit)
       {
          // no space, skip this packet
@@ -1133,19 +1150,26 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
          goto TIMER_CHECK;
       }
 
+      // 到这里，说明发送缓冲区还有足够的空间，可以接收数据包
+
       unit->m_Packet.setLength(self->m_iPayloadSize);
 
       // reading next incoming packet, recvfrom returns -1 is nothing has been received
+      // 接收出错
       if (self->m_pChannel->recvfrom(addr, unit->m_Packet) < 0)
          goto TIMER_CHECK;
 
+      // 获取数据包的id
       id = unit->m_Packet.m_iID;
 
       // ID 0 is for connection request, which should be passed to the listening socket or rendezvous sockets
+      // 0 == id，说明这是一个连接请求包
       if (0 == id)
       {
+         // 监听模式，调用listen，创建新的UDT连接
          if (NULL != self->m_pListener)
             self->m_pListener->listen(addr, unit->m_Packet);
+         // 会合连接模式
          else if (NULL != (u = self->m_pRendezvousQueue->retrieve(addr, id)))
          {
             // asynchronous connect: call connect here
@@ -1156,24 +1180,33 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
                self->storePkt(id, unit->m_Packet.clone());
          }
       }
+      // id > 0, 说明这是一个数据包
       else if (id > 0)
       {
+         // 根据哈希表查找UDT实例
          if (NULL != (u = self->m_pHash->lookup(id)))
          {
+            // 检查对端地址是否匹配
             if (CIPAddress::ipcmp(addr, u->m_pPeerAddr, u->m_iIPversion))
             {
+               // 检查连接状态，连接正常则开始处理数据包
                if (u->m_bConnected && !u->m_bBroken && !u->m_bClosing)
                {
-                  if (0 == unit->m_Packet.getFlag())
+                  // 包类型：0表示数据包，1表示控制包
+                  if (0 == unit->m_Packet.getFlag()){
                      u->processData(unit);
-                  else
+                  }
+                  // 控制包
+                  else{
                      u->processCtrl(unit->m_Packet);
+                  }
 
                   u->checkTimers();
                   self->m_pRcvUList->update(u);
                }
             }
          }
+         // 会合连接模式
          else if (NULL != (u = self->m_pRendezvousQueue->retrieve(addr, id)))
          {
             if (!u->m_bSynRecving)
@@ -1186,20 +1219,32 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
 TIMER_CHECK:
       // take care of the timing event for all UDT sockets
 
+      // 当前时间戳
       uint64_t currtime;
       CTimer::rdtsc(currtime);
 
       CRNode* ul = self->m_pRcvUList->m_pUList;
+      // 100ms的时间窗口
       uint64_t ctime = currtime - 100000 * CTimer::getCPUFrequency();
+      // ul->m_llTimeStamp < ctime 说明这个UDT实例已经超过100ms没有更新了，需要进行检查
       while ((NULL != ul) && (ul->m_llTimeStamp < ctime))
       {
          CUDT* u = ul->m_pUDT;
 
+         /*
+            检查连接状态
+            1. 连接正常，调用update()将当前节点移动到列表m_pRcvUList末尾
+            2. 连接异常，调用remove()从哈希表和m_pRcvUList列表中移除
+            3. 由于重新调整了m_pRcvUList，故需要重新获取m_pRcvUList的头节点
+         */
+
+         // 连接正常
          if (u->m_bConnected && !u->m_bBroken && !u->m_bClosing)
          {
             u->checkTimers();
             self->m_pRcvUList->update(u);
          }
+         // 连接异常，则从哈希表和UDT接收实例列表中移除
          else
          {
             // the socket must be removed from Hash table first, then RcvUList
@@ -1208,13 +1253,16 @@ TIMER_CHECK:
             u->m_pRNode->m_bOnList = false;
          }
 
+         // 由于重新调整了m_pRcvUList，故需要重新获取m_pRcvUList的头节点
          ul = self->m_pRcvUList->m_pUList;
       }
 
       // Check connection requests status for all sockets in the RendezvousQueue.
+      // 更新会合模式下的连接状态
       self->m_pRendezvousQueue->updateConnStatus();
    }
 
+   // 释放资源
    if (AF_INET == self->m_UnitQueue.m_iIPversion)
       delete (sockaddr_in*)addr;
    else
@@ -1355,18 +1403,22 @@ void CRcvQueue::setNewEntry(CUDT* u)
    m_vNewEntry.push_back(u);
 }
 
+// 检查是否有新的连接待处理
 bool CRcvQueue::ifNewEntry()
 {
    return !(m_vNewEntry.empty());
 }
 
+// 获取第一个待处理的连接
 CUDT* CRcvQueue::getNewEntry()
 {
    CGuard listguard(m_IDLock);
 
+   // 没有新的连接，返回NULL
    if (m_vNewEntry.empty())
       return NULL;
 
+   // 获取第一个待处理的连接
    CUDT* u = (CUDT*)*(m_vNewEntry.begin());
    m_vNewEntry.erase(m_vNewEntry.begin());
 

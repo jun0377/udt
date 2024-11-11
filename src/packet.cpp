@@ -324,7 +324,7 @@ iovec* CPacket::getPacketVector()
    return m_PacketVector;
 }
 
-// 获取报文中的flag,m_nHeader[0]的bit[0]
+// 获取包类型：0表示数据包，1表示控制包
 int CPacket::getFlag() const
 {
    // read bit 0

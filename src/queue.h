@@ -577,12 +577,12 @@ private:
 private:
    // 同步访问，临界区保护
    pthread_mutex_t m_LSLock;
-   // 指向监听的UDT实例
+   // 指向监听的UDT实例，用来接受新的连接
    CUDT* m_pListener;                                   // pointer to the (unique, if any) listening UDT entity
    // 管理交汇连接模式的队列
    CRendezvousQueue* m_pRendezvousQueue;                // The list of sockets in rendezvous mode
 
-   // 存储新的UDT实例
+   // 存储新连接的vector,等待建立新的连接
    std::vector<CUDT*> m_vNewEntry;                      // newly added entries, to be inserted
    pthread_mutex_t m_IDLock;
 
