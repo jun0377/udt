@@ -596,7 +596,9 @@ void CSndQueue::init(CChannel* c, CTimer* t)
          throw CUDTException(3, 1);
    #endif
 }
-
+/* 
+   从SndList中pop数据，通过UDP通道发送到对端
+*/
 #ifndef WIN32
    // 从SndList中pop数据，通过UDP通道发送到对端
    void* CSndQueue::worker(void* param)
@@ -1092,14 +1094,13 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
    #endif
 }
 
-// UDT接收队列工作线程，处理接收到的数据包
+// UDT接收队列工作线程，处理新的连接和新的数据包
 /*
    1. 首先检查是否有新的连接，如果有，则将新的连接插入到UDT接收实例列表和哈希表中
    2. 接受新的包，判断是数据包还是控制包，按相应类型进行处理
-   3. m_pUList中存储这新接受到的数据包，需要更新m_pUList列表的状态
+   3. m_pUList中存储着新接受到的数据包，需要更新m_pUList列表的状态
    4. 释放资源
 */
-
 #ifndef WIN32
    void* CRcvQueue::worker(void* param)
 #else
@@ -1108,6 +1109,7 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
 {
    CRcvQueue* self = (CRcvQueue*)param;
 
+   // IPv4/IPv6
    sockaddr* addr = (AF_INET == self->m_UnitQueue.m_iIPversion) ? (sockaddr*) new sockaddr_in : (sockaddr*) new sockaddr_in6;
    CUDT* u = NULL;
    int32_t id;
@@ -1202,6 +1204,7 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
                   }
 
                   u->checkTimers();
+                  // 更新m_pRcvUList
                   self->m_pRcvUList->update(u);
                }
             }

@@ -397,6 +397,7 @@ private: // Sending related data
    // 计算发送速度和带宽
    CPktTimeWindow* m_pSndTimeWindow;            // Packet sending time window
 
+   // 发送间隔，用户带宽控制
    volatile uint64_t m_ullInterval;             // Inter-packet time, in CPU clock cycles
    // 当前时间与计划发送时间的差值，用于在发送数据时进行时间调度，确保数据在适当的时间发送
    uint64_t m_ullTimeDiff;                      // aggregate difference in inter-packet time

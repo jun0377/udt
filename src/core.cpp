@@ -1782,14 +1782,20 @@ void CUDT::sample(CPerfMon* perf, bool clear)
    }
 }
 
+// 更新拥塞控制信息
 void CUDT::CCUpdate()
 {
+   // 拥塞控制间隔
    m_ullInterval = (uint64_t)(m_pCC->m_dPktSndPeriod * m_ullCPUFrequency);
+   // 更新拥塞窗口
    m_dCongestionWindow = m_pCC->m_dCWndSize;
 
+   // 带宽限制
    if (m_llMaxBW <= 0)
       return;
+   // 计算最小发送间隔
    const double minSP = 1000000.0 / (double(m_llMaxBW) / m_iMSS) * m_ullCPUFrequency;
+   // 更新最小发送间隔
    if (m_ullInterval < minSP)
        m_ullInterval = minSP;
 }
@@ -2524,6 +2530,13 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
 }
 
 // 处理数据包
+/*
+   1. 更新拥塞控制信息
+   2. 计算码率和带宽
+   3. 将数据包添加到接收缓冲区
+   4. 丢包检测与处理，更新接收侧的丢包列表，如果发生丢包，向对端返回NAK包
+   5. 更新最大序列号，注意：并不是小于这个序列号的包都已经被确认了，包含待重传的包
+*/
 int CUDT::processData(CUnit* unit)
 {
    // 获取数据包
@@ -2583,7 +2596,7 @@ int CUDT::processData(CUnit* unit)
       lossdata[1] = CSeqNo::decseq(packet.m_iSeqNo);
 
       // Generate loss report immediately.
-      // 立即向对端报告丢包， 3表示是一个NAK包
+      // 立即向对端报告丢包， 3表示是一个NAK包，NAK包如果也丢失了呢？
       sendCtrl(3, NULL, lossdata, (CSeqNo::incseq(m_iRcvCurrSeqNo) == CSeqNo::decseq(packet.m_iSeqNo)) ? 1 : 2);
 
       // 更新读报统计信息
@@ -2700,6 +2713,7 @@ int CUDT::listen(sockaddr* addr, CPacket& packet)
 void CUDT::checkTimers()
 {
    // update CC parameters
+   // 更新拥塞控制参数：拥塞窗口大小，发送间隔
    CCUpdate();
    //uint64_t minint = (uint64_t)(m_ullCPUFrequency * m_pSndTimeWindow->getMinPktSndInt() * 0.9);
    //if (m_ullInterval < minint)
