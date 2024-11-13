@@ -331,7 +331,18 @@ int CPacket::getFlag() const
    return m_nHeader[0] >> 31;
 }
 
-// 获取报文类型，ACK/ACK-2/NAK/各类控制报文
+/* 
+   获取报文类型，ACK/ACK-2/NAK/各类控制报文
+     0010- ACK包
+     0110- ACK-2包
+     0011- NAK包，报告发生了丢包
+     0111- 拥塞警告，报告发生了拥塞
+     0001- 保活报文
+     0000- 握手报文
+     0101- 关闭连接报文
+     0111- 丢包请求报文
+     1000- 收到了对端的错误信号
+*/
 int CPacket::getType() const
 {
    // read bit 1~15

@@ -571,7 +571,7 @@ private:
    bool ifNewEntry();
    CUDT* getNewEntry();
 
-   // 保存packet
+   // 保存握手阶段的控制报文到m_mBuffer中
    void storePkt(int32_t id, CPacket* pkt);
 
 private:

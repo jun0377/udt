@@ -778,7 +778,7 @@ void CIPAddress::pton(sockaddr* addr, const uint32_t ip[4], int ver)
    }
 }
 
-//
+// 
 void CMD5::compute(const char* input, unsigned char result[16])
 {
    md5_state_t state;

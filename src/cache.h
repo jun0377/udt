@@ -311,7 +311,7 @@ private:
    CCache& operator=(const CCache&);
 };
 
-
+// UDT用于缓存网络连接信息的类
 class CInfoBlock
 {
 public:

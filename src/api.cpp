@@ -331,28 +331,42 @@ UDTSOCKET CUDTUnited::newSocket(int af, int type)
    return ns->m_SocketID;
 }
 
+/* 
+   建立新的连接
+      1. 首先检查是否存在重复连接
+      2. 检查待处理连接队列是否已满，已满则拒绝新的连接
+      3. 构建新的连接
+      4. 绑定到一个UDP通道
+      5. 将新的连接添加到待处理连接队列中
+*/
 int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHandShake* hs)
 {
+   // 新连接
    CUDTSocket* ns = NULL;
+   // 监听套接字
    CUDTSocket* ls = locate(listen);
 
    if (NULL == ls)
       return -1;
 
    // if this connection has already been processed
+   // 避免重复连接
    if (NULL != (ns = locate(peer, hs->m_iID, hs->m_iISN)))
    {
+      // 如果旧的连接已经断开，清理之
       if (ns->m_pUDT->m_bBroken)
       {
          // last connection from the "peer" address has been broken
          ns->m_Status = CLOSED;
          ns->m_TimeStamp = CTimer::getTime();
 
+         // 从监听套接字的待处理连接队列和已连接队列中移除
          CGuard::enterCS(ls->m_AcceptLock);
          ls->m_pQueuedSockets->erase(ns->m_SocketID);
          ls->m_pAcceptSockets->erase(ns->m_SocketID);
          CGuard::leaveCS(ls->m_AcceptLock);
       }
+      // 旧的连接正常，说明是一个重复的连接请求，封装一个错误报文，后续返回给对端
       else
       {
          // connection already exist, this is a repeated connection request
@@ -371,9 +385,11 @@ int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHan
    }
 
    // exceeding backlog, refuse the connection request
+   // 待处理连接队列已满，拒绝连接请求
    if (ls->m_pQueuedSockets->size() >= ls->m_uiBackLog)
       return -1;
 
+   // 创建新的连接
    try
    {
       ns = new CUDTSocket;
@@ -411,11 +427,14 @@ int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHan
 
    int error = 0;
 
+   // 绑定到一个UDP通道
    try
    {
       // bind to the same addr of listening socket
       ns->m_pUDT->open();
+      // 绑定到一个UDP通道
       updateMux(ns, ls);
+      // 向对端回复握手响应报文
       ns->m_pUDT->connect(peer, hs);
    }
    catch (...)
@@ -424,9 +443,11 @@ int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHan
       goto ERR_ROLLBACK;
    }
 
+   // 更新状态为CONNECTED
    ns->m_Status = CONNECTED;
 
    // copy address information of local node
+   // 获取本地地址
    ns->m_pUDT->m_pSndQueue->m_pChannel->getSockAddr(ns->m_pSelfAddr);
    CIPAddress::pton(ns->m_pSelfAddr, ns->m_pUDT->m_piSelfIP, ns->m_iIPversion);
 
@@ -435,6 +456,7 @@ int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHan
    try
    {
       m_Sockets[ns->m_SocketID] = ns;
+      // 记录来自同一个对方所有的连接请求，避免重复连接
       m_PeerRec[(ns->m_PeerID << 30) + ns->m_iISN].insert(ns->m_SocketID);
    }
    catch (...)
@@ -443,6 +465,7 @@ int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHan
    }
    CGuard::leaveCS(m_ControlLock);
 
+   // 将新连接添加到待处理连接队列中
    CGuard::enterCS(ls->m_AcceptLock);
    try
    {
@@ -455,8 +478,10 @@ int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHan
    CGuard::leaveCS(ls->m_AcceptLock);
 
    // acknowledge users waiting for new connections on the listening socket
+   // 更新监听套接字的epoll事件为UDT_EPOLL_IN，等待新连接
    m_EPoll.update_events(listen, ls->m_pUDT->m_sPollID, UDT_EPOLL_IN, true);
 
+   // 唤醒一个等待的accept()调用
    CTimer::triggerEvent();
 
    ERR_ROLLBACK:

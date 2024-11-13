@@ -870,16 +870,20 @@ void CUDT::connect(const sockaddr* peer, CHandShake* hs)
    CGuard cg(m_ConnectionLock);
 
    // Uses the smaller MSS between the peers        
+   // MSS协商，使用较小的MSS
    if (hs->m_iMSS > m_iMSS)
       hs->m_iMSS = m_iMSS;
    else
       m_iMSS = hs->m_iMSS;
 
    // exchange info for maximum flow window size
+   // 滑动窗口大小
    m_iFlowWindowSize = hs->m_iFlightFlagSize;
    hs->m_iFlightFlagSize = (m_iRcvBufSize < m_iFlightFlagSize)? m_iRcvBufSize : m_iFlightFlagSize;
 
+   // 初始序列号
    m_iPeerISN = hs->m_iISN;
+
 
    m_iRcvLastAck = hs->m_iISN;
    m_iRcvLastAckAck = hs->m_iISN;
@@ -899,12 +903,14 @@ void CUDT::connect(const sockaddr* peer, CHandShake* hs)
    m_ullSndLastAck2Time = CTimer::getTime();
 
    // this is a reponse handshake
+   // 握手响应报文
    hs->m_iReqType = -1;
 
    // get local IP address and send the peer its IP address (because UDP cannot get local IP address)
+   // 获取本地IP地址并向对端发送其IP地址（因为UDP无法获取本地IP地址）
    memcpy(m_piSelfIP, hs->m_piPeerIP, 16);
    CIPAddress::ntop(peer, hs->m_piPeerIP, m_iIPversion);
-  
+   // 计算最大报文段
    m_iPktSize = m_iMSS - 28;
    m_iPayloadSize = m_iPktSize - CPacket::m_iPktHdrSize;
 
@@ -924,6 +930,7 @@ void CUDT::connect(const sockaddr* peer, CHandShake* hs)
       throw CUDTException(3, 2, 0);
    }
 
+   // 获取历史连接性能信息缓存查询，不用从零开始估算网络性能，减少连接初期的性能波动
    CInfoBlock ib;
    ib.m_iIPversion = m_iIPversion;
    CInfoBlock::convert(peer, m_iIPversion, ib.m_piIP);
@@ -933,6 +940,7 @@ void CUDT::connect(const sockaddr* peer, CHandShake* hs)
       m_iBandwidth = ib.m_iBandwidth;
    }
 
+   // 拥塞控制初始参数
    m_pCC = m_pCCFactory->create();
    m_pCC->m_UDT = m_SocketID;
    m_pCC->setMSS(m_iMSS);
@@ -943,9 +951,12 @@ void CUDT::connect(const sockaddr* peer, CHandShake* hs)
    m_pCC->setBandwidth(m_iBandwidth);
    m_pCC->init();
 
+   // 发送间隔，用于带宽控制
    m_ullInterval = (uint64_t)(m_pCC->m_dPktSndPeriod * m_ullCPUFrequency);
+   // 拥塞窗口大小
    m_dCongestionWindow = m_pCC->m_dCWndSize;
 
+   // 保存对端地址
    m_pPeerAddr = (AF_INET == m_iIPversion) ? (sockaddr*)new sockaddr_in : (sockaddr*)new sockaddr_in6;
    memcpy(m_pPeerAddr, peer, (AF_INET == m_iIPversion) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
 
@@ -953,10 +964,12 @@ void CUDT::connect(const sockaddr* peer, CHandShake* hs)
    m_bConnected = true;
 
    // register this socket for receiving data packets
+   // 注册接收队列
    m_pRNode->m_bOnList = true;
    m_pRcvQueue->setNewEntry(this);
 
    //send the response to the peer, see listen() for more discussions about this
+   // 向对端发送握手响应报文
    CPacket response;
    int size = CHandShake::m_iContentSize;
    char* buffer = new char[size];
@@ -2627,29 +2640,39 @@ int CUDT::processData(CUnit* unit)
    return 0;
 }
 
+// 处理连接请求
 int CUDT::listen(sockaddr* addr, CPacket& packet)
 {
+   // 如果UDT实例正在关闭，返回错误码
    if (m_bClosing)
       return 1002;
 
+   // 握手报文的长度固定为48byte，如果长度不正常，返回错误码
    if (packet.getLength() != CHandShake::m_iContentSize)
       return 1004;
 
+   // 握手报文解包
    CHandShake hs;
    hs.deserialize(packet.m_pcData, packet.getLength());
 
-   // SYN cookie
+   // SYN cookie, cookie用于连接认证
    char clienthost[NI_MAXHOST];
    char clientport[NI_MAXSERV];
+
+   // 获取客户端的IP地址和端口号
    getnameinfo(addr, (AF_INET == m_iVersion) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6), clienthost, sizeof(clienthost), clientport, sizeof(clientport), NI_NUMERICHOST|NI_NUMERICSERV);
+   // 计算时间戳，每分钟变化一次
    int64_t timestamp = (CTimer::getTime() - m_StartTime) / 60000000; // secret changes every one minute
+   // 根据拼接的字符串生成MD5值,相同的四元组和时间戳，生成的cookie相同
    stringstream cookiestr;
    cookiestr << clienthost << ":" << clientport << ":" << timestamp;
    unsigned char cookie[16];
    CMD5::compute(cookiestr.str().c_str(), cookie);
 
+   // 普通连接请求，即第一次握手
    if (1 == hs.m_iReqType)
    {
+      // 第一次握手，发送cookie到客户端
       hs.m_iCookie = *(int*)cookie;
       packet.m_iID = hs.m_iID;
       int size = packet.getLength();
@@ -2657,41 +2680,53 @@ int CUDT::listen(sockaddr* addr, CPacket& packet)
       m_pSndQueue->sendto(addr, packet);
       return 0;
    }
+   // 第二次握手，验证cookie
    else
    {
+      // 如果cookie不匹配，重新计算cookie
       if (hs.m_iCookie != *(int*)cookie)
       {
+         // 时间戳减1，重新计算cookie，即尝试使用前一分钟的时间戳重新验证
          timestamp --;
          cookiestr << clienthost << ":" << clientport << ":" << timestamp;
          CMD5::compute(cookiestr.str().c_str(), cookie);
 
+         // 如果重新计算的cookie仍然不匹配，返回错误码，连接失败
          if (hs.m_iCookie != *(int*)cookie)
             return -1;
       }
    }
 
+   // 至此，握手成功
+
    int32_t id = hs.m_iID;
 
    // When a peer side connects in...
+   // 控制报文，且为握手报文，说明有一个新的连接
    if ((1 == packet.getFlag()) && (0 == packet.getType()))
    {
+      // UDT版本或套接字类型不匹配，拒绝连接
       if ((hs.m_iVersion != m_iVersion) || (hs.m_iType != m_iSockType))
       {
          // mismatch, reject the request
+         // 向对端返回1002错误报文，表示连接建立失败
          hs.m_iReqType = 1002;
          int size = CHandShake::m_iContentSize;
          hs.serialize(packet.m_pcData, size);
          packet.m_iID = id;
          m_pSndQueue->sendto(addr, packet);
       }
+      // 验证通过，开始建立新的连接
       else
-      {
+      {  
+         // 建立新的连接
          int result = s_UDTUnited.newConnection(m_SocketID, addr, &hs);
          if (result == -1)
             hs.m_iReqType = 1002;
 
          // send back a response if connection failed or connection already existed
          // new connection response should be sent in connect()
+         // 连接建立失败，返回错误报文，避免对端一直等待
          if (result != 1)
          {
             int size = CHandShake::m_iContentSize;
@@ -2699,6 +2734,7 @@ int CUDT::listen(sockaddr* addr, CPacket& packet)
             packet.m_iID = id;
             m_pSndQueue->sendto(addr, packet);
          }
+         // 连接建立成功，进入epoll中，关注写事件
          else
          {
             // a new connection has been created, enable epoll for write 
