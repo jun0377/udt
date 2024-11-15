@@ -370,7 +370,7 @@ int CSndUList::pop(sockaddr*& addr, CPacket& pkt)
    // 获取当前时间戳
    uint64_t ts;
    CTimer::rdtsc(ts);
-   // 如果当前时间戳比发送数据的时间戳小，说明稍微到待发送数据规划的调度时间，直接返回
+   // 如果当前时间戳比发送数据的时间戳小，说明尚未到待发送数据规划的调度时间，直接返回
    if (ts < m_pHeap[0]->m_llTimeStamp)
       return -1;
 
@@ -407,6 +407,7 @@ void CSndUList::remove(const CUDT* u)
    remove_(u);
 }
 
+// 下一次调度时间，即堆顶元素的发送时间戳
 uint64_t CSndUList::getNextProcTime()
 {
    // lock_guard

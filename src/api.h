@@ -257,8 +257,9 @@ private:
    // 根据socket id从m_Sockets中查找对应的CUDTSocket实例
    CUDTSocket* locate(const UDTSOCKET u);
    CUDTSocket* locate(const sockaddr* peer, const UDTSOCKET id, int32_t isn);
-   // 更新CMultiplexer，每一个CMultiplexer都是一个已建立的UDP连接
+   // 更新UDP多路复用器，每一个CMultiplexer都是一个已建立的UDP连接
    void updateMux(CUDTSocket* s, const sockaddr* addr = NULL, const UDPSOCKET* = NULL);
+   // 更新UDP多路复用器，处理监听套接字
    void updateMux(CUDTSocket* s, const CUDTSocket* ls);
 
 private:

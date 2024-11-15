@@ -2413,10 +2413,18 @@ void CUDT::processCtrl(CPacket& ctrlpkt)
    }
 }
 
-// 打包成UDT报文
+/*
+   打包成UDT报文
+      1. 重传队列中的数据优先级最高，优先发送
+      2. 从发送缓冲区中读数据
+      3. 拥塞窗口和滑动窗口剩余空间足够，则允许发送数据；否则禁止发送
+      4. 将从发送缓冲区中读到的数据封装成一个packet,并计算packet的调度时间
+      5. 此外，还向拥塞控制模块报告了数据包的发送
+*/
 int CUDT::packData(CPacket& packet, uint64_t& ts)
 {
    int payload = 0;
+   // 带宽探测标志位
    bool probe = false;
 
    // 当前时间
@@ -2429,7 +2437,7 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
 
    // Loss retransmission always has higher priority.
    // 丢包重传队列的优先级最高，先处理丢包队列中的数据
-   // 注意这里是个赋值操作，并不是尽心比较
+   // 注意这里是个赋值操作，并不是进行比较
    if ((packet.m_iSeqNo = m_pSndLossList->getLostSeq()) >= 0)
    {
       // protect m_iSndLastDataAck from updating by ACK processing
@@ -2437,6 +2445,7 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
 
       // 序列号偏移量
       int offset = CSeqNo::seqoff(m_iSndLastDataAck, packet.m_iSeqNo);
+      // 偏移量有效性检查
       if (offset < 0)
          return 0;
 
@@ -2445,17 +2454,21 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
       // 从发送缓冲区中读取数据
       payload = m_pSndBuffer->readData(&(packet.m_pcData), offset, packet.m_iMsgNo, msglen);
 
+      // 从发送缓冲区读取数据失败，发送控制包，通知接收端产生了丢包，并告知丢包长度
       if (-1 == payload)
       {
+         // 发送控制包，通知接收端产生了丢包，并告知丢包长度
          int32_t seqpair[2];
          seqpair[0] = packet.m_iSeqNo;
          seqpair[1] = CSeqNo::incseq(seqpair[0], msglen);
          sendCtrl(7, &packet.m_iMsgNo, seqpair, 8);
 
          // only one msg drop request is necessary
+         // 从发送端丢包列表中删除这些包，因为这些包无法进行重传
          m_pSndLossList->remove(seqpair[1]);
 
          // skip all dropped packets
+         // 跳过这些丢包，更新当前发送序列号
          if (CSeqNo::seqcmp(m_iSndCurrSeqNo, CSeqNo::incseq(seqpair[1])) < 0)
              m_iSndCurrSeqNo = CSeqNo::incseq(seqpair[1]);
 
@@ -2467,25 +2480,34 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
       ++ m_iTraceRetrans;
       ++ m_iRetransTotal;
    }
+   // 重传队列为空，则从发送缓冲区中读取正常的数据
    else
    {
       // If no loss, pack a new packet.
 
       // check congestion/flow window limit
+      // 获取拥塞窗口和滑动窗口中的较小值
       int cwnd = (m_iFlowWindowSize < (int)m_dCongestionWindow) ? m_iFlowWindowSize : (int)m_dCongestionWindow;
+      // 待确认数据包的数量尚未超过窗口大小限制，正常发送
       if (cwnd >= CSeqNo::seqlen(m_iSndLastAck, CSeqNo::incseq(m_iSndCurrSeqNo)))
       {
+         // 从发送缓冲区中读取数据
          if (0 != (payload = m_pSndBuffer->readData(&(packet.m_pcData), packet.m_iMsgNo)))
          {
+            // 更新当前发送序列号
             m_iSndCurrSeqNo = CSeqNo::incseq(m_iSndCurrSeqNo);
+            // 更新拥塞控制模块中的当前发送序列号
             m_pCC->setSndCurrSeqNo(m_iSndCurrSeqNo);
 
+            // 更新UDT报文的序列号
             packet.m_iSeqNo = m_iSndCurrSeqNo;
 
             // every 16 (0xF) packets, a packet pair is sent
+            // 每16个包发送一对探测包，用于带宽探测
             if (0 == (packet.m_iSeqNo & 0xF))
                probe = true;
          }
+         // 发送缓冲区为空
          else
          {
             m_ullTargetTime = 0;
@@ -2494,6 +2516,7 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
             return 0;
          }
       }
+      // 待确认数据包的数量超过窗口大小限制，此时禁止发送新的数据
       else
       {
          m_ullTargetTime = 0;
@@ -2503,32 +2526,41 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
       }
    }
 
+   // 更新UDT报文的时间戳，当前时间 - UDT实例启动时间
    packet.m_iTimeStamp = int(CTimer::getTime() - m_StartTime);
+   // 更新UDT报文的目标ID，使UDP复用器能够找到指定的UDT流
    packet.m_iID = m_PeerID;
+   // 更新UDT报文的负载数据大小
    packet.setLength(payload);
 
+   // 拥塞控制，通知拥塞控制模块有新的数据包发送
    m_pCC->onPktSent(&packet);
    //m_pSndTimeWindow->onPktSent(packet.m_iTimeStamp);
 
    ++ m_llTraceSent;
    ++ m_llSentTotal;
 
+   // 探测包立即发送，不需要等待调度
    if (probe)
    {
       // sends out probing packet pair
       ts = entertime;
       probe = false;
    }
+   // 普通包需要等待调度
    else
    {
       #ifndef NO_BUSY_WAITING
+         // 忙等模式
          ts = entertime + m_ullInterval;
       #else
+         // 非忙等待模式, 达到调度时间，立即发送
          if (m_ullTimeDiff >= m_ullInterval)
          {
             ts = entertime;
             m_ullTimeDiff -= m_ullInterval;
          }
+         // 非忙等待模式，尚未达到调度时间，计算调度时间
          else
          {
             ts = entertime + m_ullInterval - m_ullTimeDiff;
@@ -2537,6 +2569,7 @@ int CUDT::packData(CPacket& packet, uint64_t& ts)
       #endif
    }
 
+   // 更新下一次调度时间
    m_ullTargetTime = ts;
 
    return payload;

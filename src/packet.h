@@ -65,7 +65,7 @@ public:
    int32_t& m_iSeqNo;                   // alias: sequence number
    // UDT消息号,注意：是一个引用，真实的值在m_nHeader[1]中
    int32_t& m_iMsgNo;                   // alias: message number
-   // 时间戳，注意：是一个引用，真实的值在m_nHeader[2]中
+   // 时间戳，当前时间 - UDT实例启动时间;注意：是一个引用，真实的值在m_nHeader[2]中
    int32_t& m_iTimeStamp;               // alias: timestamp
    // socket ID，注意：是一个引用，真实的值在m_nHeader[3]中
    int32_t& m_iID;			// alias: socket ID

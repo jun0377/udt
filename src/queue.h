@@ -154,7 +154,7 @@ struct CSNode
 {
    // 关联的CUDT实例
    CUDT* m_pUDT;		// Pointer to the instance of CUDT socket
-   // 调度时间戳
+   // 调度时间戳，即数据的发送时间戳
    uint64_t m_llTimeStamp;      // Time Stamp
 
    // 堆节点索引
@@ -598,8 +598,9 @@ private:
    CRcvQueue& operator=(const CRcvQueue&);
 };
 
-// CMultiplexer，UDP连接复用器，每一个CMultiplexer都是一个已建立的UDP连接
+// CMultiplexer，UDP多路复用器，每一个CMultiplexer都是一个已建立的UDP通道
 // 描述了一个UDT套接字相关的发送/接收队列,端口号等参数
+// 每个UDP端口使用一个多路复用器。即，不同UDP端口上的UDT套接字将由不同的多路复用器处理
 struct CMultiplexer
 {
    // 发送队列，存储待发送的数据
@@ -617,11 +618,12 @@ struct CMultiplexer
    int m_iIPversion;		// IP version
    // 最大报文段大小
    int m_iMSS;			// Maximum Segment Size
-   // UDT实例个数
+   // 引用计数，即关联的UDT实例个数
    int m_iRefCount;		// number of UDT instances that are associated with this multiplexer
    // 地址是否可以复用
    bool m_bReusable;		// if this one can be shared with others
 
+   // UDP多路复用器ID
    int m_iID;			// multiplexer ID
 };
 

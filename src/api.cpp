@@ -432,7 +432,7 @@ int CUDTUnited::newConnection(const UDTSOCKET listen, const sockaddr* peer, CHan
    {
       // bind to the same addr of listening socket
       ns->m_pUDT->open();
-      // 绑定到一个UDP通道
+      // 复用已存在的监听套接字
       updateMux(ns, ls);
       // 向对端回复握手响应报文
       ns->m_pUDT->connect(peer, hs);
@@ -1488,6 +1488,13 @@ void CUDTUnited::checkTLSValue()
 }
 #endif
 
+/*
+   UDP通道复用
+      1. 首先从map中查找UDP通道是否已经存在，已存在则复用
+      2. 不存在，则创建新的UDP通道，并加入到map中
+      3. server端：在UDP的bind阶段调用，加入监听套接字
+      4. client端：在UDP的connect阶段调用，加入local套接字
+ */
 void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET* udpsock)
 {
    std::cout << "CUDTUnited::updateMux()..." << std::endl;
@@ -1500,7 +1507,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
       int port = (AF_INET == s->m_pUDT->m_iIPversion) ? ntohs(((sockaddr_in*)addr)->sin_port) : ntohs(((sockaddr_in6*)addr)->sin6_port);
 
       // find a reusable address
-      // 找到一个可复用的地址，即使用一个已建立的连接
+      // 找到一个可复用的地址，即使用一个已建立的UDP物理通道
       for (map<int, CMultiplexer>::iterator i = m_mMultiplexer.begin(); i != m_mMultiplexer.end(); ++ i)
       {
          if ((i->second.m_iIPversion == s->m_pUDT->m_iIPversion) && (i->second.m_iMSS == s->m_pUDT->m_iMSS) && i->second.m_bReusable)
@@ -1508,6 +1515,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
             if (i->second.m_iPort == port)
             {
                // reuse the existing multiplexer
+               // 复用已存在的UDP物理通道
                ++ i->second.m_iRefCount;
                s->m_pUDT->m_pSndQueue = i->second.m_pSndQueue;
                s->m_pUDT->m_pRcvQueue = i->second.m_pRcvQueue;
@@ -1519,7 +1527,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
    }
 
    // a new multiplexer is needed
-   // 创建一个新的multiplexer
+   // 不存在匹配的UDP通道,则创建一个新的UDP通道
    CMultiplexer m;
    m.m_iMSS = s->m_pUDT->m_iMSS;
    m.m_iIPversion = s->m_pUDT->m_iIPversion;
@@ -1527,6 +1535,7 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
    m.m_bReusable = s->m_pUDT->m_bReuseAddr;
    m.m_iID = s->m_SocketID;
 
+   // 创建UDP通道
    m.m_pChannel = new CChannel(s->m_pUDT->m_iIPversion);
    m.m_pChannel->setSndBufSize(s->m_pUDT->m_iUDPSndBufSize);
    m.m_pChannel->setRcvBufSize(s->m_pUDT->m_iUDPRcvBufSize);
@@ -1572,19 +1581,24 @@ void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET*
    s->m_iMuxID = m.m_iID;
 }
 
+// 监听套接字复用
 void CUDTUnited::updateMux(CUDTSocket* s, const CUDTSocket* ls)
 {
+   // lock_guard
    CGuard cg(m_ControlLock);
 
+   // 从IPv4/IPv6地址中获取端口号
    int port = (AF_INET == ls->m_iIPversion) ? ntohs(((sockaddr_in*)ls->m_pSelfAddr)->sin_port) : ntohs(((sockaddr_in6*)ls->m_pSelfAddr)->sin6_port);
 
    // find the listener's address
+   // 查找监听套接字
    for (map<int, CMultiplexer>::iterator i = m_mMultiplexer.begin(); i != m_mMultiplexer.end(); ++ i)
    {
+      // 存在已建立的UDP通道，则复用之
       if (i->second.m_iPort == port)
       {
          // reuse the existing multiplexer
-         ++ i->second.m_iRefCount;
+         ++ i->second.m_iRefCount;   // 引用计数+1
          s->m_pUDT->m_pSndQueue = i->second.m_pSndQueue;
          s->m_pUDT->m_pRcvQueue = i->second.m_pRcvQueue;
          s->m_iMuxID = i->second.m_iID;

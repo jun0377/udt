@@ -408,9 +408,10 @@ private: // Sending related data
    volatile int m_iFlowWindowSize;              // Flow control window size
    // 拥塞窗口大小
    volatile double m_dCongestionWindow;         // congestion window size
-
+   // 最后一个ACK序列号
    volatile int32_t m_iSndLastAck;              // Last ACK received
    volatile int32_t m_iSndLastDataAck;          // The real last ACK that updates the sender buffer and loss list
+   // 当前发送序列号
    volatile int32_t m_iSndCurrSeqNo;            // The largest sequence number that has been sent
    int32_t m_iLastDecSeq;                       // Sequence number sent last decrease occurs
    int32_t m_iSndLastAck2;                      // Last ACK2 sent back
@@ -480,6 +481,7 @@ private: // Trace
    int m_iSndLossTotal;                         // total number of lost packets (sender side)
    // 接收侧丢包统计
    int m_iRcvLossTotal;                         // total number of lost packets (receiver side)
+   // 重传包总数
    int m_iRetransTotal;                         // total number of retransmitted packets
    int m_iSentACKTotal;                         // total number of sent ACK packets
    int m_iRecvACKTotal;                         // total number of received ACK packets
@@ -496,6 +498,7 @@ private: // Trace
    int m_iTraceSndLoss;                         // number of lost packets in the last trace interval (sender side)
    // 最近一个统计收起内，丢包数量
    int m_iTraceRcvLoss;                         // number of lost packets in the last trace interval (receiver side)
+   // 当前统计周期内，重传的包数量
    int m_iTraceRetrans;                         // number of retransmitted packets in the last trace interval
    int m_iSentACK;                              // number of ACKs sent in the last trace interval
    int m_iRecvACK;                              // number of ACKs received in the last trace interval
