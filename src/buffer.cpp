@@ -313,6 +313,7 @@ void CSndBuffer::ackData(int offset)
    CTimer::triggerEvent();
 }
 
+// 发送缓冲区中已使用的数据块数量
 int CSndBuffer::getCurrBufSize() const
 {
    return m_iCount;
@@ -564,7 +565,7 @@ int CRcvBuffer::getRcvDataSize() const
    if (m_iLastAckPos >= m_iStartPos)
       return m_iLastAckPos - m_iStartPos;
    
-   // 唤醒缓冲区数据量
+   // 环形缓冲区数据量
    return m_iSize + m_iLastAckPos - m_iStartPos;
 }
 

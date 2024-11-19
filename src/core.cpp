@@ -110,6 +110,7 @@ CUDT::CUDT()
    m_bSynSending = true;
    m_bSynRecving = true;
    m_iFlightFlagSize = 25600;
+   // 发送缓冲区默认大小
    m_iSndBufSize = 8192;
    m_iRcvBufSize = 8192; //Rcv buffer MUST NOT be bigger than Flight Flag size
    m_Linger.l_onoff = 1;
@@ -273,6 +274,7 @@ void CUDT::setOpt(UDTOpt optName, const void* optval, int)
 
       break;
 
+   // 发送缓冲区大小
    case UDT_SNDBUF:
       if (m_bOpened)
          throw CUDTException(5, 1, 0);
@@ -280,10 +282,12 @@ void CUDT::setOpt(UDTOpt optName, const void* optval, int)
       if (*(int*)optval <= 0)
          throw CUDTException(5, 3, 0);
 
+      // 28 bytes是IP头和UDP头
       m_iSndBufSize = *(int*)optval / (m_iMSS - 28);
 
       break;
 
+   // 接收缓冲区大小
    case UDT_RCVBUF:
       if (m_bOpened)
          throw CUDTException(5, 1, 0);
@@ -298,6 +302,7 @@ void CUDT::setOpt(UDTOpt optName, const void* optval, int)
          m_iRcvBufSize = 32;
 
       // recv buffer MUST not be greater than FC size
+      // 接收缓冲区大小不能超过流控窗口大小
       if (m_iRcvBufSize > m_iFlightFlagSize)
          m_iRcvBufSize = m_iFlightFlagSize;
 
@@ -392,11 +397,13 @@ void CUDT::getOpt(UDTOpt optName, void* optval, int& optlen)
       optlen = sizeof(int);
       break;
 
+   // 发送缓冲区大小
    case UDT_SNDBUF:
       *(int*)optval = m_iSndBufSize * (m_iMSS - 28);
       optlen = sizeof(int);
       break;
 
+   // 接收缓冲区大小
    case UDT_RCVBUF:
       *(int*)optval = m_iRcvBufSize * (m_iMSS - 28);
       optlen = sizeof(int);
@@ -629,6 +636,7 @@ void CUDT::connect(const sockaddr* serv_addr)
    m_ConnReq.m_iVersion = m_iVersion;
    m_ConnReq.m_iType = m_iSockType;
    m_ConnReq.m_iMSS = m_iMSS;
+   // 流控窗口大小
    m_ConnReq.m_iFlightFlagSize = (m_iRcvBufSize < m_iFlightFlagSize)? m_iRcvBufSize : m_iFlightFlagSize;
    m_ConnReq.m_iReqType = (!m_bRendezvous) ? 1 : 0;
    m_ConnReq.m_iID = m_SocketID;
@@ -867,6 +875,8 @@ POST_CONNECT:
 
 void CUDT::connect(const sockaddr* peer, CHandShake* hs)
 {
+   std::cout << "CUDT::connect " << __func__ << " : " << __LINE__ << std::endl;
+
    CGuard cg(m_ConnectionLock);
 
    // Uses the smaller MSS between the peers        
@@ -1193,7 +1203,7 @@ int CUDT::send(const char* data, int len)
 
    // record total time used for sending
    // 记录发送数据用了多长时间
-   if (0 == m_pSndBuffer->getCurrBufSize())
+   if (0 == m_pSndBuffer->getCurrBufSize())     // 发送缓冲区为空
       m_llSndDurationCounter = CTimer::getTime();
 
    // insert the user buffer into the sening list
@@ -1233,7 +1243,7 @@ int CUDT::recv(char* data, int len)
    // lock_guard
    CGuard recvguard(m_RecvLock);
 
-   // 接收缓冲区中无数据
+   // 接收缓冲区中无数据，在条件变量上休眠，等待有数据时唤醒
    if (0 == m_pRcvBuffer->getRcvDataSize())
    {
       // 为什么这里要抛出异常

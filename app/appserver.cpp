@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
    //UDT::setsockopt(serv, 0, UDT_RCVBUF, new int(10000000), sizeof(int));
    //UDT::setsockopt(serv, 0, UDP_RCVBUF, new int(10000000), sizeof(int));
 
-   // bind
+   // bind,将UDT逻辑连接和一个UDP通道绑定
    if (UDT::ERROR == UDT::bind(serv, res->ai_addr, res->ai_addrlen))
    {
       cout << "[main] bind: " << UDT::getlasterror().getErrorMessage() << endl;

@@ -371,8 +371,9 @@ int CSndUList::pop(sockaddr*& addr, CPacket& pkt)
    uint64_t ts;
    CTimer::rdtsc(ts);
    // 如果当前时间戳比发送数据的时间戳小，说明尚未到待发送数据规划的调度时间，直接返回
-   if (ts < m_pHeap[0]->m_llTimeStamp)
+   if (ts < m_pHeap[0]->m_llTimeStamp){
       return -1;
+   }
 
    // 获取堆顶元素对应的UDT实例
    CUDT* u = m_pHeap[0]->m_pUDT;
@@ -423,6 +424,8 @@ uint64_t CSndUList::getNextProcTime()
 
 void CSndUList::insert_(int64_t ts, const CUDT* u)
 {
+   // std::cout << "insert_ : ts : " << ts << std::endl;
+
    // 取出UDT实例中的待发送数据
    CSNode* n = u->m_pSNode;
 
@@ -1141,7 +1144,6 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
       // 从m_UnitQueue中获取一个空闲的数据单元
       CUnit* unit = self->m_UnitQueue.getNextAvailUnit();
       // 接收缓冲区已满，则跳过这个数据包
-      // 这个数据包被丢弃了吗？还是由于没有向发送端返回ACK，发送端会进行重传？
       if (NULL == unit)
       {
          // no space, skip this packet
@@ -1170,17 +1172,23 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
       if (0 == id)
       {
          // 监听模式，调用listen，创建新的UDT连接
-         if (NULL != self->m_pListener)
+         if (NULL != self->m_pListener){
+            std::cout << __func__ << " : " << __LINE__ << std::endl;
             self->m_pListener->listen(addr, unit->m_Packet);
+         }
          // 会合连接模式
          else if (NULL != (u = self->m_pRendezvousQueue->retrieve(addr, id)))
          {
             // asynchronous connect: call connect here
             // otherwise wait for the UDT socket to retrieve this packet
-            if (!u->m_bSynRecving)
+            if (!u->m_bSynRecving){
+               std::cout << __func__ << " : " << __LINE__ << std::endl;
                u->connect(unit->m_Packet);
-            else
+            }
+            else{
+               std::cout << __func__ << " : " << __LINE__ << std::endl;
                self->storePkt(id, unit->m_Packet.clone());
+            }
          }
       }
       // id > 0, 说明这是一个数据包

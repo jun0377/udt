@@ -326,7 +326,7 @@ private: // Options
    bool m_bSynSending;                          // Sending syncronization mode
    // 同步接收模式,难道是阻塞模式
    bool m_bSynRecving;                          // Receiving syncronization mode
-   // 对端发送的最大数据包个数
+   // 流控窗口大小，单位：packet
    int m_iFlightFlagSize;                       // Maximum number of packets in flight from the peer side
    // 发送缓冲区最大容量
    int m_iSndBufSize;                           // Maximum UDT sender buffer size

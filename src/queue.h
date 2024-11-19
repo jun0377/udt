@@ -133,7 +133,7 @@ private:
    // 最新的一个可用数据单元
    CUnit* m_pAvailUnit;         // recent available unit
 
-   // 队列中的packet总数
+   // 队列容量，单位:packet
    int m_iSize;			// total size of the unit queue, in number of packets
    // 有多少数据单元处于非空闲状态
    int m_iCount;		// total number of valid packets in the queue

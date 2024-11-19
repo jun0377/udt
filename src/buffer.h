@@ -163,7 +163,7 @@ private:
    // 实际分配的内存 = 数据块个数m_iSize * 最大包大小m_iMSS
    // 数据块的个数
    int m_iSize;				// buffer size (number of packets)
-   // 最大报文段/最大包大小
+   // 最大报文段/最大包大小,也是每个数据块的长度
    int m_iMSS;                          // maximum seqment/packet size
 
    // 已使用的数据块
