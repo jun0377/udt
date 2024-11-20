@@ -2605,17 +2605,17 @@ int CUDT::processData(CUnit* unit)
    CPacket& packet = unit->m_Packet;
 
    // Just heard from the peer, reset the expiration count.
-   // 重置超时计数器
+   // 重置超时计数器，当超时计数器达到一定阈值后，认为连接断开
    m_iEXPCount = 1;
    // 当前时间戳
    uint64_t currtime;
    CTimer::rdtsc(currtime);
-   // 更新响应时间戳
+   // 更新对端最后一次响应时间戳
    m_ullLastRspTime = currtime;
 
    // 拥塞控制
    m_pCC->onPktReceived(&packet);
-   // 数据包计数
+   // 两次ACK之间的数据包计数
    ++ m_iPktCount;
    // update time information
    // 更新接受时间窗口信息，用于计算码率和带宽
@@ -2652,7 +2652,7 @@ int CUDT::processData(CUnit* unit)
       m_pRcvLossList->insert(CSeqNo::incseq(m_iRcvCurrSeqNo), CSeqNo::decseq(packet.m_iSeqNo));
 
       // pack loss list for NAK
-      // 计算NAK 否定确认数据
+      // 计算NAK 否定确认数据，告知对端发生了丢包
       int32_t lossdata[2];
       lossdata[0] = CSeqNo::incseq(m_iRcvCurrSeqNo) | 0x80000000; // 最高位设置为1，表示控制报文
       lossdata[1] = CSeqNo::decseq(packet.m_iSeqNo);

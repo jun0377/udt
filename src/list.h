@@ -136,6 +136,7 @@ public:
       // Returned value:
       //    None.
 
+   // 插入一对序列号，表示丢包范围
    void insert(int32_t seqno1, int32_t seqno2);
 
       // Functionality:
@@ -145,6 +146,7 @@ public:
       // Returned value:
       //    if the packet is removed (true) or no such lost packet is found (false).
 
+   // 删除一个序列号
    bool remove(int32_t seqno);
 
       // Functionality:
@@ -155,6 +157,7 @@ public:
       // Returned value:
       //    if the packet is removed (true) or no such lost packet is found (false).
 
+   // 删除一个序列号范围
    bool remove(int32_t seqno1, int32_t seqno2);
 
       // Functionality:
@@ -165,6 +168,7 @@ public:
       // Returned value:
       //    True if found; otherwise false.
 
+   // 查找一个序列号范围
    bool find(int32_t seqno1, int32_t seqno2) const;
 
       // Functionality:
@@ -174,6 +178,7 @@ public:
       // Returned value:
       //    the length of the list.
 
+   // 获取丢包数量
    int getLossLength() const;
 
       // Functionality:
@@ -183,6 +188,7 @@ public:
       // Returned value:
       //    the sequence number or -1 if the list is empty.
 
+   // 获取最小序列号
    int getFirstLostSeq() const;
 
       // Functionality:
@@ -194,17 +200,26 @@ public:
       // Returned value:
       //    None.
 
+   // 获取丢包数组
    void getLossArray(int32_t* array, int& len, int limit);
 
 private:
+   // 数组，记录起始序列号
    int32_t* m_piData1;                  // sequence number starts
+   // 数组，记录终止序列号
    int32_t* m_piData2;                  // sequence number ends
+   // 数组，记录下一个节点在 m_piData1 和 m_piData2 中的位置
    int* m_piNext;                       // next node in the list
+   // 数组，记录前一个节点在 m_piData1 和 m_piData2 中的位置
    int* m_piPrior;                      // prior node in the list;
 
+   // 第一个节点的索引
    int m_iHead;                         // first node in the list
+   // 最后一个节点的索引
    int m_iTail;                         // last node in the list;
+   // 丢包数量
    int m_iLength;                       // loss length
+   // 静态数组的大小
    int m_iSize;                         // size of the static array
 
 private:
