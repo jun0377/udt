@@ -1908,16 +1908,19 @@ void CUDT::sendCtrl(int pkttype, void* lparam, void* rparam, int size)
 
       // If there is no loss, the ACK is the current largest sequence number plus 1;
       // Otherwise it is the smallest sequence number in the receiver loss list.
+      // 优先处理丢包
       if (0 == m_pRcvLossList->getLossLength())
          ack = CSeqNo::incseq(m_iRcvCurrSeqNo);
       else
          ack = m_pRcvLossList->getFirstLostSeq();
 
+      // 和上一次ACK相同，不必重复发送
       if (ack == m_iRcvLastAckAck)
          break;
 
       // send out a lite ACK
       // to save time on buffer processing and bandwidth/AS measurement, a lite ACK only feeds back an ACK number
+      // 轻量级ACK，值包含确认号，不携带RTT/窗口大小...等信息
       if (4 == size)
       {
          ctrlpkt.pack(pkttype, NULL, &ack, size);
@@ -1931,12 +1934,14 @@ void CUDT::sendCtrl(int pkttype, void* lparam, void* rparam, int size)
       CTimer::rdtsc(currtime);
 
       // There are new received packets to acknowledge, update related information.
+      // 有新的数据包需要确认的情况
       if (CSeqNo::seqcmp(ack, m_iRcvLastAck) > 0)
       {
+         // 计算需要确认的数据包数量
          int acksize = CSeqNo::seqoff(m_iRcvLastAck, ack);
-
+         // 更新ACK序列号
          m_iRcvLastAck = ack;
-
+         // 更新接收缓冲区的确认点
          m_pRcvBuffer->ackData(acksize);
 
          // signal a waiting "recv" call if there is any data available
@@ -1953,6 +1958,7 @@ void CUDT::sendCtrl(int pkttype, void* lparam, void* rparam, int size)
          // acknowledge any waiting epolls to read
          s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, UDT_EPOLL_IN, true);
       }
+      // 和上一次ACK相同，不必重复发送
       else if (ack == m_iRcvLastAck)
       {
          if ((currtime - m_ullLastAckTime) < ((m_iRTT + 4 * m_iRTTVar) * m_ullCPUFrequency))
@@ -2789,6 +2795,13 @@ int CUDT::listen(sockaddr* addr, CPacket& packet)
    return hs.m_iReqType;
 }
 
+/*
+   定时器检查
+      1. 更新拥塞控制参数
+      2. 检查是否需要发送ACK确认
+      3. 重传检测/连接断开检测
+*/
+
 void CUDT::checkTimers()
 {
    // update CC parameters
@@ -2798,15 +2811,19 @@ void CUDT::checkTimers()
    //if (m_ullInterval < minint)
    //   m_ullInterval = minint;
 
+   // 当前时间戳
    uint64_t currtime;
    CTimer::rdtsc(currtime);
 
+   // 如果当前时间戳大于下一次ACK时间，或者ACK间隔时间到达，需要发送ACK确认
    if ((currtime > m_ullNextACKTime) || ((m_pCC->m_iACKInterval > 0) && (m_pCC->m_iACKInterval <= m_iPktCount)))
    {
       // ACK timer expired or ACK interval is reached
 
+      // 发送ACK确认
       sendCtrl(2);
       CTimer::rdtsc(currtime);
+      // 更新下一次发送ACK的时间
       if (m_pCC->m_iACKPeriod > 0)
          m_ullNextACKTime = currtime + m_pCC->m_iACKPeriod * m_ullCPUFrequency;
       else
@@ -2815,9 +2832,23 @@ void CUDT::checkTimers()
       m_iPktCount = 0;
       m_iLightACKCount = 1;
    }
+   // 轻量级ACK发送的条件: 两次ACK之间的数据包数量达到一定阈值
    else if (m_iSelfClockInterval * m_iLightACKCount <= m_iPktCount)
    {
+      /*
+         自适应确认: 
+            收包越快 -> 更频繁发送轻量级ACK
+            收包越慢 -> 减少ACK发送频率
+         性能优化:
+            减少完整ACK开销
+            适应高速传输
+            保持基本的可靠性
+         节省带宽:
+            轻量级ACK包非常小
+      */
+
       //send a "light" ACK
+      // 发送轻量级ACK，只包含确认号，不包含RTT/窗口大小...等信息
       sendCtrl(2, NULL, NULL, 4);
       ++ m_iLightACKCount;
    }
@@ -2832,9 +2863,15 @@ void CUDT::checkTimers()
    //   m_ullNextNAKTime = currtime + m_ullNAKInt;
    //}
 
+   // 重传超时检查
    uint64_t next_exp_time;
+   // 用户自定义了重传超时时间RTO
    if (m_pCC->m_bUserDefinedRTO)
+   {
+      // 下次超时时间 = 上次响应时间 + 用户自定义的RTO * CPU频率
       next_exp_time = m_ullLastRspTime + m_pCC->m_iRTO * m_ullCPUFrequency;
+   }
+   // 用户没有自定义RTO，使用默认的RTO计算方法
    else
    {
       uint64_t exp_int = (m_iEXPCount * (m_iRTT + 4 * m_iRTTVar) + m_iSYNInterval) * m_ullCPUFrequency;
@@ -2843,10 +2880,12 @@ void CUDT::checkTimers()
       next_exp_time = m_ullLastRspTime + exp_int;
    }
 
+   // 需要进行重传超时检测
    if (currtime > next_exp_time)
    {
       // Haven't receive any information from the peer, is it dead?!
       // timeout: at least 16 expirations and must be greater than 10 seconds
+      // 超时条件：至少16次超时，且对端超过10秒无响应
       if ((m_iEXPCount > 16) && (currtime - m_ullLastRspTime > 5000000 * m_ullCPUFrequency))
       {
          //
@@ -2854,13 +2893,17 @@ void CUDT::checkTimers()
          // UDT does not signal any information about this instead of to stop quietly.
          // Application will detect this when it calls any UDT methods next time.
          //
+         // 连接断开，设置关闭标志，并设置断开标志
          m_bClosing = true;
          m_bBroken = true;
+         // 让GC线程能够检测到连接断开
          m_iBrokenCounter = 30;
 
          // update snd U list to remove this socket
+         // 更新发送队列，移除该UDT实例
          m_pSndQueue->m_pSndUList->update(this);
 
+         // 释放锁
          releaseSynch();
 
          // app can call any UDT API to learn the connection_broken error
@@ -2873,23 +2916,32 @@ void CUDT::checkTimers()
 
       // sender: Insert all the packets sent after last received acknowledgement into the sender loss list.
       // recver: Send out a keep-alive packet
+      // 发送方：将最后一次确认后发送的所有报文插入发送方丢失列表中。
+      // 接收方：发送keep-alive报文
+
+      // 发送缓冲区中仍有数据
       if (m_pSndBuffer->getCurrBufSize() > 0)
       {
+         // 当前序列号大于最后一次确认序列号，且发送方丢失列表为空
          if ((CSeqNo::incseq(m_iSndCurrSeqNo) != m_iSndLastAck) && (m_pSndLossList->getLossLength() == 0))
          {
             // resend all unacknowledged packets on timeout, but only if there is no packet in the loss list
+            // 将所有未确认的包加入丢包列表
             int32_t csn = m_iSndCurrSeqNo;
             int num = m_pSndLossList->insert(m_iSndLastAck, csn);
             m_iTraceSndLoss += num;
             m_iSndLossTotal += num;
          }
 
+         // 更新拥塞控制参数
          m_pCC->onTimeout();
          CCUpdate();
 
          // immediately restart transmission
+         // 立即重传
          m_pSndQueue->m_pSndUList->update(this);
       }
+      // 发送keep-alive报文
       else
       {
          sendCtrl(1);
@@ -2897,6 +2949,7 @@ void CUDT::checkTimers()
 
       ++ m_iEXPCount;
       // Reset last response time since we just sent a heart-beat.
+      // 重置对端最后一次响应时间
       m_ullLastRspTime = currtime;
    }
 }

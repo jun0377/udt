@@ -370,7 +370,7 @@ private: // Status
    bool m_bOpened;                              // If the UDT entity has been opened
    int m_iBrokenCounter;			// a counter (number of GC checks) to let the GC tag this socket as disconnected
 
-   // 超时计时器
+   // 超时次数检测，当超时计数达到某个值后，认为连接断开
    int m_iEXPCount;                             // Expiration counter
    // 估算的带宽，每秒有多少个包
    int m_iBandwidth;                            // Estimated bandwidth, number of packets per second
@@ -517,6 +517,7 @@ private: // Timers
    static const int m_iSYNInterval;             // Periodical Rate Control Interval, 10000 microsecond
    static const int m_iSelfClockInterval;       // ACK interval for self-clocking
 
+   // 下一次发送ACK的时间
    uint64_t m_ullNextACKTime;			// Next ACK time, in CPU clock cycles, same below
    uint64_t m_ullNextNAKTime;			// Next NAK time
 
@@ -526,7 +527,7 @@ private: // Timers
    volatile uint64_t m_ullACKInt;		// ACK interval
    // NACK包的时间间隔
    volatile uint64_t m_ullNAKInt;		// NAK interval
-   // 对端相应的时间戳，用于超时检测
+   // 对端上次响应时间，用于超时检测
    volatile uint64_t m_ullLastRspTime;		// time stamp of last response from the peer
 
    // NACK超时下限，超时将重传
@@ -534,8 +535,9 @@ private: // Timers
    // 超时时间下限
    uint64_t m_ullMinExpInt;			// timeout lower bound threshold: too small timeout can cause problem
 
-   // ACK包统计
+   // 两次ACK之间的数据包数量,用来判断是否需要发送一个light ACK
    int m_iPktCount;				// packet counter for ACK
+   // 轻量级ACK计数，轻量级ACK只包含确认号，不包含RTT/窗口大小...等信息
    int m_iLightACKCount;			// light ACK counter
 
    // 下一个数据包的调度时间

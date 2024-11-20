@@ -227,7 +227,7 @@ public:
       // Returned value:
       //    1 if a user buffer is fulfilled, otherwise 0.
 
-   // 更新接收缓冲区的确认点
+   // 已ACK确认数据
    void ackData(int len);
 
       // Functionality:
