@@ -875,7 +875,7 @@ POST_CONNECT:
 
 void CUDT::connect(const sockaddr* peer, CHandShake* hs)
 {
-   std::cout << "CUDT::connect " << __func__ << " : " << __LINE__ << std::endl;
+   // std::cout << "CUDT::connect " << __func__ << " : " << __LINE__ << std::endl;
 
    CGuard cg(m_ConnectionLock);
 
@@ -2671,7 +2671,7 @@ int CUDT::processData(CUnit* unit)
 
    // This is not a regular fixed size packet...   
    //an irregular sized packet usually indicates the end of a message, so send an ACK immediately   
-   // 包长度不等于标准负载大小，表示一个消息的结束
+   // 包长度不等于标准负载大小，表示一个消息的结束，下一次执行此函数时，立即发送ACK确认
    if (packet.getLength() != m_iPayloadSize)   
       CTimer::rdtsc(m_ullNextACKTime); 
 

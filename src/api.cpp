@@ -1497,7 +1497,7 @@ void CUDTUnited::checkTLSValue()
  */
 void CUDTUnited::updateMux(CUDTSocket* s, const sockaddr* addr, const UDPSOCKET* udpsock)
 {
-   std::cout << "CUDTUnited::updateMux()..." << std::endl;
+   // std::cout << "CUDTUnited::updateMux()..." << std::endl;
    CGuard cg(m_ControlLock);
 
    // 地址复用

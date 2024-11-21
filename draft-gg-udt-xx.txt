@@ -167,7 +167,8 @@ Yunhong Gu            Expires - October 12, 2010              [Page 3]
                                  UDT                   April 12, 2010 
  
          
-1.  Introduction 
+1. 
+ Introduction 
     
    The Transmission Control Protocol (TCP) [RFC5681] has been very 
    successful and greatly contributes to the popularity of today's 
@@ -233,7 +234,8 @@ Yunhong Gu            Expires - October 12, 2010              [Page 4]
    description and performance analysis can be found in [GG07], and a 
    fully functional reference implementation can be found at [UDT]. 
     
-2.  Packet Structures 
+2. 
+ Packet Structures 
     
    UDT has two kinds of packets: the data packets and the control 
    packets. They are distinguished by the 1st bit (flag bit) of the 
@@ -388,7 +390,8 @@ Yunhong Gu            Expires - October 12, 2010              [Page 7]
  
  
     
-3.  UDP Multiplexer 
+3. 
+ UDP Multiplexer 
  
    A UDP multiplexer is used to handle concurrent UDT connections 
    sharing the same UDP port. The multiplexer dispatch incoming UDT 
@@ -418,7 +421,8 @@ Yunhong Gu            Expires - October 12, 2010              [Page 7]
    scans the list to check if any timer expires for each socket every 
    SYN (SYN = 0.01 second, defined in Section 4). 
     
-4.  Timers 
+4. 
+ Timers 
     
    UDT uses four timers to trigger different periodical events. Each 
    event has its own period and they are all independent. They use the 
@@ -465,7 +469,8 @@ Yunhong Gu            Expires - October 12, 2010              [Page 8]
    of its period, depending on the context. For example, ACK can mean 
    either the ACK event or the value of ACK period. 
     
-5.  Connection Setup and shutdown 
+5. 
+ Connection Setup and shutdown 
     
    UDT supports two different connection setup methods, the traditional 
    client/server mode and the rendezvous mode. In the latter mode, both 
@@ -497,7 +502,8 @@ Yunhong Gu            Expires - October 12, 2010              [Page 9]
                                  UDT                   April 12, 2010 
  
  
-5.1   Client/Server Connection Setup 
+5.1 
+  Client/Server Connection Setup 
     
    One UDT entity starts first as the server (listener). The server 
    accepts and processes incoming connection request, and creates new 
@@ -532,7 +538,8 @@ Yunhong Gu            Expires - October 12, 2010              [Page 9]
    The client should also check if the response is from the server that 
    the original request was sent to. 
     
-5.2   Rendezvous Connection Setup 
+5.2 
+  Rendezvous Connection Setup 
     
    In this mode, both clients send a connect request to each other at 
    the same time. The initial connection type is set to 0. Once a peer 
@@ -559,7 +566,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 10]
    firewalls. It can also provide better security and usability when a 
    listening server is not desirable. 
     
-5.3    Shutdown 
+5.3 
+   Shutdown 
     
    If one of the connected UDT entities is being closed, it will send a 
    shutdown message to the peer side. The peer side, after received this 
@@ -571,7 +579,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 10]
    In our reference implementation, we use 3 seconds and 30 seconds, 
    respectively. 
     
-6.  Data Sending and Receiving 
+6. 
+ Data Sending and Receiving 
  
    Each UDT entity has two logical parts: the sender and the receiver. 
    The sender sends (and retransmits) application data according to the 
@@ -590,7 +599,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 10]
    We explained the rationale of some of the UDT data sending/receiving 
    schemes in [GHG04b]. 
  
-6.1   The Sender's Algorithm 
+6.1 
+  The Sender's Algorithm 
     
    Data Structures and Variables: 
     
@@ -624,7 +634,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 11]
       updated by congestion control and t is the total time used by step 
       1 to step 5. Go to 1).  
     
-6.2   The Receiver's Algorithm 
+6.2 
+  The Receiver's Algorithm 
     
    Data Structures and Variables: 
     
@@ -779,7 +790,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 14]
    On Handshake/Shutdown packet received: 
    See Section 5. 
     
-6.3    Flow Control 
+6.3 
+   Flow Control 
     
    The flow control window size is 16 initially. 
     
@@ -787,7 +799,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 14]
    The flow window size is updated to the receiver's available buffer 
    size. 
  
-6.4   Loss Information Compression Scheme 
+6.4 
+  Loss Information Compression Scheme 
     
    The loss information carried in an NAK packet is an array of 32-bit 
    integers. If an integer in the array is a normal sequence number (1st 
@@ -801,7 +814,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 14]
    means packets with sequence number 2, 6, 7, 8, 9, 10, 11, and 14 are 
    lost. 
     
-7.  Configurable Congestion Control (CCC) 
+7. 
+ Configurable Congestion Control (CCC) 
     
    The congestion control in UDT is an open framework so that user-
    defined control algorithm can be easily implemented and switched. 
@@ -813,7 +827,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 14]
    when certain event occurs. For example, when an ACK is received, the 
    control algorithm may increase the congestion window size. 
     
-7.1   CCC Interface 
+7.1 
+  CCC Interface 
     
    UDT allow users to access two congestion control parameters: the 
    congestion window size and the inter-packet sending interval. Users 
@@ -863,7 +878,8 @@ Yunhong Gu            Expires - October 12, 2010             [Page 15]
    Detailed description and discussion of UDT/CCC can be found in 
    [GG05]. 
     
-7.2   UDT's Native Control Algorithm 
+7.2 
+  UDT's Native Control Algorithm 
     
    UDT has a native and default control algorithm, which will be used if 
    no user-defined algorithm is implemented and configured. The native 

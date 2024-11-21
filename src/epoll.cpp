@@ -75,7 +75,7 @@ int CEPoll::create()
 
    #ifdef LINUX
   
-   // 调用系统API创建一个epoll实例
+   // 调用系统API创建一个epoll实例,epoll_create的参数已经无效了
    localid = epoll_create(1024);
    if (localid < 0)
       throw CUDTException(-1, 0, errno);
@@ -202,10 +202,12 @@ int CEPoll::remove_ssock(const int eid, const SYSSOCKET& s)
 int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefds, int64_t msTimeOut, set<SYSSOCKET>* lrfds, set<SYSSOCKET>* lwfds)
 {
    // if all fields is NULL and waiting time is infinite, then this would be a deadlock
+   // 参数判断
    if (!readfds && !writefds && !lrfds && lwfds && (msTimeOut < 0))
       throw CUDTException(5, 3, 0);
 
    // Clear these sets in case the app forget to do it.
+   // 清空所有套接字集合
    if (readfds) readfds->clear();
    if (writefds) writefds->clear();
    if (lrfds) lrfds->clear();
@@ -229,7 +231,7 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          throw CUDTException(5, 13);
       }
 
-      // 没有需要关注的套接字，退出临界区
+      // 没有需要关注的套接字，抛出异常
       if (p->second.m_sUDTSocksIn.empty() && p->second.m_sUDTSocksOut.empty() && p->second.m_sLocals.empty() && (msTimeOut < 0))
       {
          // no socket is being monitored, this may be a deadlock
@@ -238,29 +240,34 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
       }
 
       // Sockets with exceptions are returned to both read and write sets.
-      // 将关注异常事件的套接字插入到关注可读事件的套接字集合中
+      // 有可读或异常套接字
       if ((NULL != readfds) && (!p->second.m_sUDTReads.empty() || !p->second.m_sUDTExcepts.empty()))
       {
+         // 向外传出可读套接字
          *readfds = p->second.m_sUDTReads;
+         // 异常套接字也需要传出
          for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
             readfds->insert(*i);
-         // Q:既然tatal返回的是已经准备好的套接字数量，这里为什么要赋值？
+         // 记录已准备好的套接字数量
          total += p->second.m_sUDTReads.size() + p->second.m_sUDTExcepts.size();
       }
-      // 将关注异常事件的套接字插入到关注可写事件的套接字集合中
+      // 有可写或异常套接字
       if ((NULL != writefds) && (!p->second.m_sUDTWrites.empty() || !p->second.m_sUDTExcepts.empty()))
       {
+         // 向外传出可写套接字
          *writefds = p->second.m_sUDTWrites;
+         // 异常套接字也需要传出
          for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
             writefds->insert(*i);
+         // 记录已准备好的套接字数量
          total += p->second.m_sUDTWrites.size() + p->second.m_sUDTExcepts.size();
       }
 
-      //　系统套接字 localreaadfds/localwritefds
+      //　需要监听系统套接字的读/写事件,直接调用系统API epoll_wait即可
       if (lrfds || lwfds)
       {
 #ifdef LINUX
-         // 关注的套接字数量
+         // 关注的系统套接字数量
          const int max_events = p->second.m_sLocals.size();
          // 返回的epoll_event数组
          epoll_event ev[max_events];
@@ -384,6 +391,7 @@ void update_epoll_sets(const UDTSOCKET& uid, const set<UDTSOCKET>& watch, set<UD
 
 }  // namespace
 
+// 更新udt sockfd关注的epoll事件
 int CEPoll::update_events(const UDTSOCKET& uid, std::set<int>& eids, int events, bool enable)
 {
    // lock_guard
@@ -393,7 +401,7 @@ int CEPoll::update_events(const UDTSOCKET& uid, std::set<int>& eids, int events,
    
    // 记录已删除的epoll实例
    vector<int> lost;
-   // 遍历所有的epoll实例
+   // UDT套接字uid关联的所有epoll实例
    for (set<int>::iterator i = eids.begin(); i != eids.end(); ++ i)
    {
       // 查找指定的epoll实例
@@ -406,17 +414,19 @@ int CEPoll::update_events(const UDTSOCKET& uid, std::set<int>& eids, int events,
       }
       else
       {
-         // 更新套接字对应的事件
+         // 加入可读事件的就绪集合
          if ((events & UDT_EPOLL_IN) != 0)
             update_epoll_sets(uid, p->second.m_sUDTSocksIn, p->second.m_sUDTReads, enable);
+         // 加入可写事件的就绪集合
          if ((events & UDT_EPOLL_OUT) != 0)
             update_epoll_sets(uid, p->second.m_sUDTSocksOut, p->second.m_sUDTWrites, enable);
+         // 加入异常事件的就绪集合
          if ((events & UDT_EPOLL_ERR) != 0)
             update_epoll_sets(uid, p->second.m_sUDTSocksEx, p->second.m_sUDTExcepts, enable);
       }
    }
 
-   // 删除epoll实例
+   // 从epoll实例中删除已失效的UDT实例
    for (vector<int>::iterator i = lost.begin(); i != lost.end(); ++ i)
       eids.erase(*i);
 

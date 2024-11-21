@@ -58,7 +58,7 @@ struct CEPollDesc
    // 关注异常事件的sockfd
    std::set<UDTSOCKET> m_sUDTSocksEx;        // set of UDT sockets waiting for exceptions
 
-   // 系统API创建的epoll实例
+   // 系统API创建的epoll实例标识
    int m_iLocalID;                           // local system epoll ID
    // 系统套接字，不是UDT套接字
    std::set<SYSSOCKET> m_sLocals;            // set of local (non-UDT) descriptors
@@ -183,7 +183,7 @@ private:
    int m_iIDSeed;                            // seed to generate a new ID
    pthread_mutex_t m_SeedLock;
 
-   // 使用一个map来保存所有的UDT epoll实例
+   // 使用一个map来保存所有的UDT epoll实例，一个UDT套接字可能被多个epoll实例监听
    std::map<int, CEPollDesc> m_mPolls;       // all epolls
    // 同步访问
    pthread_mutex_t m_EPollLock;

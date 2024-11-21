@@ -1173,7 +1173,7 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
       {
          // 监听模式，调用listen，创建新的UDT连接
          if (NULL != self->m_pListener){
-            std::cout << __func__ << " : " << __LINE__ << std::endl;
+            // std::cout << __func__ << " : " << __LINE__ << std::endl;
             self->m_pListener->listen(addr, unit->m_Packet);
          }
          // 会合连接模式
@@ -1182,11 +1182,11 @@ void CRcvQueue::init(int qsize, int payload, int version, int hsize, CChannel* c
             // asynchronous connect: call connect here
             // otherwise wait for the UDT socket to retrieve this packet
             if (!u->m_bSynRecving){
-               std::cout << __func__ << " : " << __LINE__ << std::endl;
+               // std::cout << __func__ << " : " << __LINE__ << std::endl;
                u->connect(unit->m_Packet);
             }
             else{
-               std::cout << __func__ << " : " << __LINE__ << std::endl;
+               // std::cout << __func__ << " : " << __LINE__ << std::endl;
                self->storePkt(id, unit->m_Packet.clone());
             }
          }

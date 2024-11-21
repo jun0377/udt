@@ -702,12 +702,19 @@ int main()
    DWORD (WINAPI *Test_Cli[test_case])(LPVOID);
 #endif
 
+   // 测试用例1，单连接
    Test_Srv[0] = Test_1_Srv;
    Test_Cli[0] = Test_1_Cli;
+
+   // 测试用例2，单线程模型，混合测试UDT和TCP
    Test_Srv[1] = Test_2_Srv;
    Test_Cli[1] = Test_2_Cli;
+
+   // 测试用例3，测试交汇连接模式
    Test_Srv[2] = Test_3_Srv;
    Test_Cli[2] = Test_3_Cli;
+
+   // 测试用例4，多线程模型，测试UDT并发连接
    Test_Srv[3] = Test_4_Srv;
    Test_Cli[3] = Test_4_Cli;
 
